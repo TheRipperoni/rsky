@@ -309,7 +309,7 @@ pub async fn parse_proxy_header<'r>(req: &'r ProxyRequest<'_>) -> Result<Option<
                                 did_doc,
                                 GetServiceEndpointOpts {
                                     id: format!("#{service_id}"),
-                                    r#type: None,
+                                    r#type: Some(String::from("BskyChatService")),
                                 },
                             ) {
                                 None => bail!(InvalidRequestError::CannotResolveServiceUrl),
