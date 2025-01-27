@@ -180,9 +180,6 @@ pub async fn validate_inputs_for_local_pds(
             if password.is_none() {
                 bail!("Password is required");
             };
-            if did.is_some() {
-                bail!("Not yet allowing people to bring their own DID");
-            };
             // @TODO: Normalize handle as well
             if !super::validate_handle(&handle) {
                 bail!("Invalid handle");

@@ -81,9 +81,9 @@ pub struct CommitRecord {
 #[derive(Debug)]
 pub struct Repo {
     storage: SqlRepoReader, // get ipld blocks from db
-    data: MST,
-    commit: Commit,
-    cid: Cid,
+    pub(crate) data: MST,
+    pub(crate) commit: Commit,
+    pub(crate) cid: Cid,
 }
 
 pub struct ActorStore {

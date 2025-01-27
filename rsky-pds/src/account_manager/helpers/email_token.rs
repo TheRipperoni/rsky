@@ -36,7 +36,7 @@ pub async fn assert_valid_token(
     token: &String,
     expiration_len: Option<i32>,
 ) -> Result<()> {
-    let expiration_len = expiration_len.unwrap_or(MINUTE * 15);
+    let expiration_len = expiration_len.unwrap_or(MINUTE * 15 * 1000);
     use crate::schema::pds::email_token::dsl as EmailTokenSchema;
     let conn = &mut establish_connection()?;
 
@@ -64,7 +64,7 @@ pub async fn assert_valid_token_and_find_did(
     token: &String,
     expiration_len: Option<i32>,
 ) -> Result<String> {
-    let expiration_len = expiration_len.unwrap_or(MINUTE * 15);
+    let expiration_len = expiration_len.unwrap_or(MINUTE * 15 * 1000); //Dirty fix for expiration issue
     use crate::schema::pds::email_token::dsl as EmailTokenSchema;
     let conn = &mut establish_connection()?;
 

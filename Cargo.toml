@@ -1,6 +1,6 @@
 [workspace]
 members = [ "rsky-common", "rsky-crypto",
-#    "rsky-feedgen", "rsky-firehose",
+    "rsky-feedgen", "rsky-firehose",
     "rsky-identity", "rsky-labeler", "rsky-lexicon", "rsky-pds", "rsky-syntax"]
 resolver = "2"
 

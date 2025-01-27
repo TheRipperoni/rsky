@@ -19,18 +19,18 @@ COPY rsky-firehose rsky-firehose
 RUN mkdir rsky-pds/src && echo "fn main() {}" > rsky-pds/src/main.rs
 
 ## Install production dependencies and build a release artifact.
-RUN cargo build --release --package rsky-pds
+RUN cargo build --package rsky-pds
 
 COPY rsky-pds/src rsky-pds/src
 
-RUN cargo build --release --package rsky-pds
+RUN cargo build --package rsky-pds
 
 
 FROM rust
 
 WORKDIR /usr/src/rsky
 
-COPY --from=builder /usr/src/rsky/target/release/rsky-pds rsky-pds
+COPY --from=builder /usr/src/rsky/target/debug/rsky-pds rsky-pds
 
 CMD ["./rsky-pds"]
 

@@ -73,6 +73,7 @@ event-emitter-rs = "0.1.4"
 lexicon_cid = { package = "cid", version = "0.10.1", features = ["serde-codec"] }
 sendgrid = "0.23.0"
 tokio = "1.42.0"
+ciborium = "0.2.2"
 
 [dependencies.rocket_sync_db_pools]
 version = "=0.1.0"

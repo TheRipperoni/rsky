@@ -39,7 +39,7 @@ async fn inner_get_blocks(
     let mut actor_store = ActorStore::new(did.clone(), S3BlobStore::new(did.clone(), s3_config));
     let got = actor_store.storage.get_blocks(cids).await?;
 
-    if got.missing.len() > 0 {
+    if !got.missing.is_empty() {
         let missing_str = got
             .missing
             .into_iter()

@@ -31,6 +31,8 @@ use rsky_pds::{
     DbConn, SharedATPAgent, SharedIdResolver, SharedLocalViewer, SharedSequencer, APP_USER_AGENT,
 };
 use std::env;
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_s3::config::Region;
 use tokio::sync::RwLock;
 
 pub struct CORS;
@@ -144,6 +146,7 @@ async fn rocket() -> _ {
 
     let aws_sdk_config = aws_config::from_env()
         .endpoint_url(env::var("AWS_ENDPOINT").unwrap_or("localhost".to_owned()))
+        .region(Region::new("auto"))
         .load()
         .await;
 
