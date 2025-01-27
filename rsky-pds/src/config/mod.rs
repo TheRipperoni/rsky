@@ -82,6 +82,7 @@ pub fn env_to_cfg() -> ServerConfig {
         privacy_policy_url: env_str("PDS_PRIVACY_POLICY_URL"),
         terms_of_service_url: env_str("PDS_TERMS_OF_SERVICE_URL"),
         accepting_imports: env_bool("PDS_ACCEPTING_REPO_IMPORTS").unwrap_or(true),
+        //TODO Unsure if this is working
         blob_upload_limit: env_int("PDS_BLOB_UPLOAD_LIMIT").unwrap_or_else(|| 5 * 1024 * 1024), // 5mb
         contact_email_address: env_str("PDS_CONTACT_EMAIL_ADDRESS"),
         dev_mode: env_bool("PDS_DEV_MODE").unwrap_or(false),

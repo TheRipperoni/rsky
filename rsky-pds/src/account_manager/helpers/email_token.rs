@@ -37,6 +37,7 @@ pub async fn assert_valid_token(
     expiration_len: Option<i32>,
 ) -> Result<()> {
     let expiration_len = expiration_len.unwrap_or(MINUTE * 15 * 1000);
+    eprint!("{}", expiration_len.to_string());
     use crate::schema::pds::email_token::dsl as EmailTokenSchema;
     let conn = &mut establish_connection()?;
 
@@ -49,6 +50,7 @@ pub async fn assert_valid_token(
         .optional()?;
     if let Some(res) = res {
         let requested_at = from_str_to_utc(&res.requested_at);
+        eprint!("{}", requested_at.to_string());
         let expired = !less_than_ago_ms(requested_at, expiration_len);
         if expired {
             bail!("Token is expired")
@@ -65,6 +67,7 @@ pub async fn assert_valid_token_and_find_did(
     expiration_len: Option<i32>,
 ) -> Result<String> {
     let expiration_len = expiration_len.unwrap_or(MINUTE * 15 * 1000); //Dirty fix for expiration issue
+    eprint!("{}", expiration_len.to_string());
     use crate::schema::pds::email_token::dsl as EmailTokenSchema;
     let conn = &mut establish_connection()?;
 
@@ -76,6 +79,7 @@ pub async fn assert_valid_token_and_find_did(
         .optional()?;
     if let Some(res) = res {
         let requested_at = from_str_to_utc(&res.requested_at);
+        eprint!("{}", requested_at.to_string());
         let expired = !less_than_ago_ms(requested_at, expiration_len);
         if expired {
             bail!("Token is expired")

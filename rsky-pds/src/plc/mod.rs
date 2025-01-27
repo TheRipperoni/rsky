@@ -91,6 +91,24 @@ impl Client {
         }
     }
 
+    pub async fn create_did_plc(
+        &self,
+        did: &String,
+        signer: &SecretKey,
+        handle: &String,
+    ) -> Result<()> {
+        let last_op: CompatibleOp = match self.ensure_last_op(did).await? {
+            CompatibleOpOrTombstone::CreateOpV1(last_op) => CompatibleOp::CreateOpV1(last_op),
+            CompatibleOpOrTombstone::Operation(last_op) => CompatibleOp::Operation(last_op),
+            CompatibleOpOrTombstone::Tombstone(_) => {
+                panic!("ensure_last_op() didn't prevent tombstone")
+            }
+        };
+        let op = update_handle_op(last_op, signer, handle.clone()).await?;
+        self.send_operation(&did, &OpOrTombstone::Operation(op))
+            .await
+    }
+
     pub async fn update_handle(
         &self,
         did: &String,
