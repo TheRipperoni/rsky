@@ -26,3 +26,11 @@ where
 pub fn sha256_raw_to_cid(hash: Vec<u8>) -> Cid {
     sha256_to_cid(hash, RawCodec)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test_cid_for_cbor() {}
+}

@@ -4,13 +4,13 @@ use libipld::cbor::encode::write_null;
 use libipld::cbor::DagCborCodec;
 use libipld::codec::Encode;
 use serde_cbor::Value as CborValue;
-use serde_json::Value as JsonValue;
+use serde_json::{Value as JsonValue, Value};
 use std::collections::BTreeMap;
 use std::io::Write;
 use thiserror::Error;
 
 /// Ipld
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub enum Ipld {
     /// Represents a Cid.
@@ -21,11 +21,62 @@ pub enum Ipld {
     Map(BTreeMap<String, Ipld>),
     /// String
     String(String),
+    /// Number
+    Integer(i64),
     /// Represents a sequence of bytes.
     #[serde(with = "serde_bytes")]
     Bytes(Vec<u8>),
     /// Represents a Json Value
     Json(JsonValue),
+}
+
+impl serde::Serialize for Ipld {
+    fn serialize<S>(&self, serializer: S) -> serde::__private::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            Ipld::Link(ref field0) => serde::Serialize::serialize(field0, serializer),
+            Ipld::List(ref field0) => serde::Serialize::serialize(field0, serializer),
+            Ipld::Map(ref field0) => serde::Serialize::serialize(field0, serializer),
+            Ipld::String(ref field0) => serde::Serialize::serialize(field0, serializer),
+            Ipld::Integer(ref field0) => serializer.serialize_i64(field0.clone()),
+            Ipld::Bytes(ref field0) => serde::Serialize::serialize(
+                {
+                    #[doc(hidden)]
+                    struct SerializeWith<'a> {
+                        values: (&'a Vec<u8>,),
+                        phantom: serde::__private::PhantomData<Ipld>,
+                    }
+                    #[automatically_derived]
+                    impl<'a> serde::Serialize for SerializeWith<'a> {
+                        fn serialize<S>(&self, s: S) -> serde::__private::Result<S::Ok, S::Error>
+                        where
+                            S: serde::Serializer,
+                        {
+                            serde_bytes::serialize(self.values.0, s)
+                        }
+                    }
+                    &SerializeWith {
+                        values: (field0,),
+                        phantom: serde::__private::PhantomData::<Ipld>,
+                    }
+                },
+                serializer,
+            ),
+            Ipld::Json(ref field0) => match field0 {
+                Value::Null => serde::Serialize::serialize(field0, serializer),
+                Value::Bool(x) => serde::Serialize::serialize(x, serializer),
+                Value::Number(x) => {
+                    let value = x.as_i64().unwrap();
+                    serializer.serialize_i64(value)
+                }
+                Value::String(x) => serde::Serialize::serialize(x, serializer),
+                Value::Array(x) => serde::Serialize::serialize(x, serializer),
+                Value::Object(x) => serde::Serialize::serialize(x, serializer),
+            },
+        }
+    }
 }
 
 impl Encode<DagCborCodec> for Ipld {
@@ -50,6 +101,7 @@ impl Encode<DagCborCodec> for Ipld {
             Self::Map(m) => m.encode(c, w),
             Self::Link(cid) => cid.encode(c, w),
             Self::String(s) => s.encode(c, w),
+            Self::Integer(i) => i.encode(c, w),
         }
     }
 }

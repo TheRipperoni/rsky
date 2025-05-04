@@ -13,13 +13,23 @@ pub async fn get_session(
 ) -> Result<Json<GetSessionOutput>, ApiError> {
     let did = auth.access.credentials.did.unwrap();
     match account_manager.get_account(&did, None).await {
-        Ok(Some(user)) => Ok(Json(GetSessionOutput {
-            handle: user.handle.unwrap_or(INVALID_HANDLE.to_string()),
-            did: user.did,
-            email: user.email,
-            did_doc: None,
-            email_confirmed: Some(user.email_confirmed_at.is_some()),
-        })),
+        Ok(Some(user)) => {
+            let active = if user.takedown_ref.is_some() {
+                false
+            } else if user.deactivated_at.is_some() {
+                false
+            } else {
+                true
+            };
+            Ok(Json(GetSessionOutput {
+                handle: user.handle.unwrap_or(INVALID_HANDLE.to_string()),
+                did: user.did,
+                email: user.email,
+                did_doc: None,
+                email_confirmed: Some(user.email_confirmed_at.is_some()),
+                active,
+            }))
+        }
         _ => Err(ApiError::AccountNotFound),
     }
 }

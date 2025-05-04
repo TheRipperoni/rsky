@@ -101,8 +101,8 @@ pub async fn server_create_account(
                 Ok(_) => {
                     tracing::info!("Succesfully sent PLC Operation")
                 }
-                Err(_) => {
-                    tracing::error!("Failed to create did:plc");
+                Err(error) => {
+                    tracing::error!("Failed to create did:plc {error}");
                     actor_store.destroy().await?;
                     return Err(ApiError::RuntimeError);
                 }
@@ -151,9 +151,11 @@ pub async fn server_create_account(
             .await
         {
             Ok(_) => {
-                tracing::debug!("Sequenece identity event succeeded");
+                tracing::info!("Sequence identity event succeeded");
             }
             Err(error) => {
+                let error = error.to_string();
+                eprintln!("{error}");
                 tracing::error!("Sequence Identity Event failed\n{error}");
                 return Err(ApiError::RuntimeError);
             }
@@ -163,7 +165,7 @@ pub async fn server_create_account(
             .await
         {
             Ok(_) => {
-                tracing::debug!("Sequence account event succeeded");
+                tracing::info!("Sequence account event succeeded");
             }
             Err(error) => {
                 tracing::error!("Sequence Account Event failed\n{error}");
@@ -172,7 +174,7 @@ pub async fn server_create_account(
         }
         match lock.sequence_commit(did.clone(), commit.clone()).await {
             Ok(_) => {
-                tracing::debug!("Sequence commit succeeded");
+                tracing::info!("Sequence commit succeeded");
             }
             Err(error) => {
                 tracing::error!("Sequence Commit failed\n{error}");
@@ -187,7 +189,7 @@ pub async fn server_create_account(
             .await
         {
             Ok(_) => {
-                tracing::debug!("Sequence sync event data from commit succeeded");
+                tracing::info!("Sequence sync event data from commit succeeded");
             }
             Err(error) => {
                 tracing::error!("Sequence sync event data from commit failed\n{error}");
@@ -200,7 +202,7 @@ pub async fn server_create_account(
         .await
     {
         Ok(_) => {
-            tracing::debug!("Successfully updated repo root");
+            tracing::info!("Successfully updated repo root");
         }
         Err(error) => {
             tracing::error!("Update Repo Root failed\n{error}");

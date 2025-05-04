@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 #[error("Cached Getter error")]
 pub struct CachedGetterError;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GetCachedOptions {
     /**
      * Do not use the cache to get the value. Always get a new value from the
@@ -86,6 +86,8 @@ impl<K: Eq + Hash + Debug + Send + Sync + Clone, V: Clone + Sync + Debug + Send>
         }
     }
 
+    //Not caching atm
+    #[tracing::instrument(skip(self))]
     pub async fn get(&self, key: &K, options: Option<GetCachedOptions>) -> V {
         let is_stale = match &self.options {
             None => None,
@@ -131,8 +133,11 @@ impl<K: Eq + Hash + Debug + Send + Sync + Clone, V: Clone + Sync + Debug + Send>
 
         let stored_value = self.get_stored(&key, options.clone()).await;
         match &stored_value {
-            None => {}
+            None => {
+                tracing::info!("No stored value found");
+            }
             Some(stored_value) => {
+                tracing::info!("Stored value found");
                 if allow_stored.clone()(stored_value.clone()) {
                     let x = PendingItem::<V> {
                         value: stored_value.clone(),
@@ -144,19 +149,27 @@ impl<K: Eq + Hash + Debug + Send + Sync + Clone, V: Clone + Sync + Debug + Send>
         }
 
         let getter = self.getter.read().await;
+        tracing::info!("Getting fresh value");
         getter.get(key.clone(), options, stored_value).await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_stored(&self, key: &K, options: Option<GetCachedOptions>) -> Option<V> {
+        tracing::info!("Getting stored value");
         let store = self.store.read().await;
         store.get(key).await.unwrap_or_else(|_| None)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn set_stored(&self, key: K, value: V) {
+        tracing::info!("Setting stored value");
         let store = self.store.read().await;
         match store.set(key.clone(), value.clone()).await {
-            Ok(_) => {}
+            Ok(_) => {
+                tracing::info!("Successfully set stored value");
+            }
             Err(_) => {
+                tracing::error!("error setting stored value");
                 if let Some(options) = &self.options {
                     if let Some(on_store_error) = &options.on_store_error {
                         on_store_error(key, value);
@@ -166,7 +179,9 @@ impl<K: Eq + Hash + Debug + Send + Sync + Clone, V: Clone + Sync + Debug + Send>
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn del_stored(&self, key: &K) {
+        tracing::info!("Deleting stored key");
         let store = self.store.read().await;
         store.del(key).await.unwrap()
     }

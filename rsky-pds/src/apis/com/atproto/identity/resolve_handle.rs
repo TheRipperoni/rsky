@@ -8,10 +8,12 @@ use rocket::State;
 use rsky_common::env::{env_list, env_str};
 use rsky_lexicon::com::atproto::identity::ResolveHandleOutput;
 
+#[tracing::instrument(skip_all)]
 async fn try_resolve_from_app_view(handle: &String) -> Result<Option<String>> {
     match env_str("PDS_BSKY_APP_VIEW_URL") {
         None => Ok(None),
         Some(bsky_app_view_url) => {
+            tracing::info!("Resolving from AppView");
             let client = reqwest::Client::builder()
                 .user_agent(APP_USER_AGENT)
                 .build()?;
@@ -26,9 +28,15 @@ async fn try_resolve_from_app_view(handle: &String) -> Result<Option<String>> {
                 .send()
                 .await;
             match res {
-                Err(_) => Ok(None),
+                Err(_) => {
+                    tracing::error!("Failed to resolve handle from AppView");
+                    Ok(None)
+                }
                 Ok(res) => match res.json::<ResolveHandleOutput>().await {
-                    Err(_) => Ok(None),
+                    Err(_) => {
+                        tracing::error!("No handle found from AppView");
+                        Ok(None)
+                    }
                     Ok(data) => Ok(Some(data.did)),
                 },
             }
@@ -40,10 +48,16 @@ async fn inner_resolve_handle(
     handle: String,
     id_resolver: &State<SharedIdResolver>,
     account_manager: AccountManager,
-) -> Result<ResolveHandleOutput> {
+) -> Result<ResolveHandleOutput, ApiError> {
     // @TODO: Implement normalizeAndEnsureValidHandle()
     let mut did: Option<String> = None;
-    let user: Option<ActorAccount> = account_manager.get_account(&handle, None).await?;
+    let user: Option<ActorAccount> = match account_manager.get_account(&handle, None).await {
+        Ok(user) => user,
+        Err(error) => {
+            tracing::error!("Error getting account from account_manager: {error}");
+            return Err(ApiError::RuntimeError);
+        }
+    };
 
     match user {
         Some(user) => did = Some(user.did),
@@ -53,7 +67,9 @@ async fn inner_resolve_handle(
                 .any(|host| handle.ends_with(host.as_str()) || handle == host[1..]);
             // this should be in our DB & we couldn't find it, so fail
             if supported_handle {
-                bail!("unable to resolve handle");
+                return Err(ApiError::HandleNotFound(
+                    "unable to resolve handle".to_string(),
+                ));
             }
         }
     }
@@ -61,21 +77,36 @@ async fn inner_resolve_handle(
     // this is not someone on our server, but we help with resolving anyway
     // @TODO: Weird error about Tokio received when this fails that leads to panic
     if did.is_none() && env_str("PDS_BSKY_APP_VIEW_URL").is_some() {
-        did = try_resolve_from_app_view(&handle).await?;
+        did = match try_resolve_from_app_view(&handle).await {
+            Ok(did) => did,
+            Err(error) => {
+                tracing::error!("Error getting account from account_manager: {error}");
+                return Err(ApiError::RuntimeError);
+            }
+        };
     }
 
     if did.is_none() {
         let mut lock = id_resolver.id_resolver.write().await;
-        did = lock.handle.resolve(&handle).await?;
+        did = match lock.handle.resolve(&handle).await {
+            Ok(did) => did,
+            Err(error) => {
+                tracing::error!("Error getting account from account_manager: {error}");
+                return Err(ApiError::RuntimeError);
+            }
+        };
+        drop(lock);
     }
 
     match did {
-        None => bail!("unable to resolve handle"),
+        None => Err(ApiError::HandleNotFound(
+            "unable to resolve handle".to_string(),
+        )),
         Some(did) => Ok(ResolveHandleOutput { did }),
     }
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(id_resolver, account_manager))]
 #[rocket::get("/xrpc/com.atproto.identity.resolveHandle?<handle>")]
 pub async fn resolve_handle(
     handle: String,
@@ -86,7 +117,7 @@ pub async fn resolve_handle(
         Ok(res) => Ok(Json(res)),
         Err(error) => {
             tracing::error!("@LOG: ERROR: {error}");
-            Err(ApiError::RuntimeError)
+            Err(error)
         }
     }
 }

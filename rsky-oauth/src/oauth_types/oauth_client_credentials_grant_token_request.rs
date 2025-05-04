@@ -129,13 +129,9 @@ mod tests {
     #[test]
     fn test_serialization() {
         let request = OAuthClientCredentialsGrantTokenRequest::new();
-
         let serialized = serde_json::to_string(&request).unwrap();
-        println!("Serialized JSON: {}", serialized);
-
         let expected = r#"{"grant_type":"client_credentials"}"#;
         assert_eq!(serialized, expected);
-
         let deserialized: OAuthClientCredentialsGrantTokenRequest =
             serde_json::from_str(&serialized).unwrap();
         assert_eq!(request, deserialized);

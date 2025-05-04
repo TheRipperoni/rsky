@@ -100,11 +100,13 @@ pub fn select_account_qb(flags: Option<AvailabilityFlags>) -> BoxedQuery<'static
     builder
 }
 
+#[tracing::instrument(skip(db, flags))]
 pub async fn get_account(
     _handle_or_did: &str,
     flags: Option<AvailabilityFlags>,
     db: &DbConn,
 ) -> Result<Option<ActorAccount>> {
+    tracing::info!("Getting account from db");
     let handle_or_did = _handle_or_did.to_owned();
     let found = db
         .run(move |conn| {

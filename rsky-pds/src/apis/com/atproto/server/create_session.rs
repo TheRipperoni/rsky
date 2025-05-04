@@ -105,6 +105,7 @@ async fn inner_create_session(
     format = "json",
     data = "<body>"
 )]
+#[tracing::instrument(skip(account_manager))]
 pub async fn create_session(
     body: Json<CreateSessionInput>,
     account_manager: AccountManager,

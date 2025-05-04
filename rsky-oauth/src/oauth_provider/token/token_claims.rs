@@ -1,6 +1,5 @@
 use crate::jwk::Audience;
 use crate::oauth_provider::oidc::sub::Sub;
-use crate::oauth_provider::token::token_id::TokenId;
 use crate::oauth_types::{OAuthClientId, OAuthScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

@@ -81,6 +81,7 @@ mod tests {
     use crate::oauth_provider::replay::replay_store_memory::ReplayStoreMemory;
     use crate::oauth_provider::token::token_id::TokenId;
     use crate::oauth_types::OAuthClientId;
+    use rocket::uri;
 
     fn create_replay_manager() -> ReplayManager {
         let replay_store = Arc::new(RwLock::new(ReplayStoreMemory::new()));
@@ -129,6 +130,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_unique_code_challenge() {
+        let mut replay_manager = create_replay_manager();
+        let challenge = String::from("challenge");
+        let result = replay_manager.unique_code_challenge(challenge).await;
+        assert_eq!(result, true);
+        let challenge = String::from("challenge");
+        let result = replay_manager.unique_code_challenge(challenge).await;
+        assert_eq!(result, false);
+    }
+
+    #[tokio::test]
+    async fn test_delete_later() {
         let mut replay_manager = create_replay_manager();
         let challenge = String::from("challenge");
         let result = replay_manager.unique_code_challenge(challenge).await;

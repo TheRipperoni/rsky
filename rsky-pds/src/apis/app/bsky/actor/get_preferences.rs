@@ -9,6 +9,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use rsky_lexicon::app::bsky::actor::{GetPreferencesOutput, RefPreferences};
 
+#[tracing::instrument(skip_all)]
 async fn inner_get_preferences(
     s3_config: &State<SdkConfig>,
     auth: AccessStandard,

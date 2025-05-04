@@ -26,29 +26,9 @@ pub fn build_document(title: &str, base_href: &str) {
     );
 }
 
-fn is_viewport_meta() {
-    unimplemented!()
-}
-
-fn link_to_html() {
-    unimplemented!()
-}
-
-fn meta_to_html() {
-    unimplemented!()
-}
-
 fn body_attrs_to_html() -> String {
     " <div id=\"root\"></div>".to_string()
 }
 fn attrs_to_html() -> String {
     " lang=en".to_string()
-}
-
-fn script_to_html() {
-    unimplemented!()
-}
-
-fn style_to_html() {
-    unimplemented!()
 }

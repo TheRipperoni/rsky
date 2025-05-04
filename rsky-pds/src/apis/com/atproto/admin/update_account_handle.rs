@@ -13,6 +13,7 @@ use rsky_common::env::env_str;
 use rsky_lexicon::com::atproto::admin::UpdateAccountHandleInput;
 use std::env;
 
+#[tracing::instrument(skip_all)]
 async fn inner_update_account_handle(
     body: Json<UpdateAccountHandleInput>,
     sequencer: &State<SharedSequencer>,
@@ -64,7 +65,7 @@ async fn inner_update_account_handle(
     Ok(())
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(sequencer, server_config, id_resolver, _auth, account_manager))]
 #[rocket::post(
     "/xrpc/com.atproto.admin.updateAccountHandle",
     format = "json",

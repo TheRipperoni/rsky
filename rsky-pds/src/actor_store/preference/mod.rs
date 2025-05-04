@@ -18,6 +18,7 @@ impl PreferenceReader {
         PreferenceReader { did, db }
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn get_preferences(
         &self,
         namespace: Option<String>,
@@ -56,7 +57,7 @@ impl PreferenceReader {
             .await
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(self))]
     pub async fn put_preferences(
         &self,
         values: Vec<RefPreferences>,

@@ -24,6 +24,7 @@ pub struct ContentType {
 impl<'r> FromRequest<'r> for ContentType {
     type Error = BadContentTypeError;
 
+    #[tracing::instrument(skip_all)]
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         match req.content_type() {
             None => Outcome::Error((
@@ -37,6 +38,7 @@ impl<'r> FromRequest<'r> for ContentType {
     }
 }
 
+#[tracing::instrument(skip_all)]
 async fn inner_upload_blob(
     auth: AccessStandardIncludeChecks,
     blob: Data<'_>,

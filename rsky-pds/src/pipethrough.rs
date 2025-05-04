@@ -94,11 +94,15 @@ impl<'r> FromRequest<'r> for HandlerPipeThrough {
                             } = xrpc
                             {
                                 tracing::error!("@LOG: XRPC ERROR Status:{status}; Message: {message:?}; Error: {error:?}; Headers: {headers:?}");
+                            } else {
+                                let message = error.to_string();
+                                tracing::error!("Error making pipethrough request {message}");
                             }
                             req.local_cache(|| Some(ApiError::InvalidRequest(error.to_string())));
                             Outcome::Error((Status::BadRequest, error))
                         }
                         _ => {
+                            tracing::error!("Error making pipethrough request");
                             req.local_cache(|| Some(ApiError::InvalidRequest(error.to_string())));
                             Outcome::Error((Status::BadRequest, error))
                         }
@@ -106,6 +110,7 @@ impl<'r> FromRequest<'r> for HandlerPipeThrough {
                 }
             }
             Outcome::Error(err) => {
+                tracing::error!("Auth Error making pipethrough");
                 req.local_cache(|| Some(ApiError::RuntimeError));
                 Outcome::Error((
                     Status::BadRequest,
@@ -143,6 +148,7 @@ impl<'r> FromRequest<'r> for ProxyRequest<'r> {
     }
 }
 
+#[tracing::instrument(skip(req, override_opts))]
 pub async fn pipethrough<'r>(
     req: &'r ProxyRequest<'_>,
     requester: Option<String>,
@@ -156,6 +162,7 @@ pub async fn pipethrough<'r>(
     let lxm = override_opts.lxm.unwrap_or(nsid);
     let headers = format_headers(req, aud, lxm, requester).await?;
     let req_init = format_req_init(req, url, headers, None)?;
+    tracing::info!("Making request");
     let res = make_request(req_init).await?;
     parse_proxy_res(res).await
 }
@@ -434,11 +441,19 @@ pub async fn make_request(req_init: RequestBuilder) -> Result<Response> {
             bail!(InvalidRequestError::XRPCError(XRPCError::UpstreamFailure))
         }
         Ok(res) => match res.error_for_status_ref() {
-            Ok(_) => Ok(res),
-            Err(_) => {
+            Ok(_) => {
+                let status = res.status().to_string();
+                let headers = res.headers().clone();
+                tracing::info!("Request Status: {status}, headers: {:?}", headers);
+
+                Ok(res)
+            }
+            Err(error) => {
                 let status = res.status().to_string();
                 let headers = res.headers().clone();
                 let error_body = res.json::<JsonValue>().await?;
+                let x = error.to_string();
+                tracing::error!("Error making request {x}");
                 bail!(InvalidRequestError::XRPCError(XRPCError::FailedResponse {
                     status,
                     headers,

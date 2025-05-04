@@ -561,11 +561,13 @@ impl LocalViewer {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn update_profile_detailed(
         &self,
         view: ProfileViewDetailed,
         record: Profile,
     ) -> ProfileViewDetailed {
+        tracing::info!("Updating profile detailed");
         let ProfileViewDetailed {
             did,
             handle,

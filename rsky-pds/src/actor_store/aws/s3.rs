@@ -28,7 +28,7 @@ impl S3BlobStore {
         let client = aws_sdk_s3::Client::new(cfg);
         S3BlobStore {
             client,
-            bucket: did,
+            bucket: "personal-pds".to_string(),
         }
     }
 

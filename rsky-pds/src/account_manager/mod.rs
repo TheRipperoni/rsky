@@ -57,6 +57,7 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 /// Helps with readability when calling create_account()
+#[derive(Debug)]
 pub struct CreateAccountOpts {
     pub did: String,
     pub handle: String,
@@ -155,7 +156,9 @@ impl AccountManager {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn create_account(&self, opts: CreateAccountOpts) -> Result<(String, String)> {
+        tracing::info!("Creating Account");
         let db = self.db.clone();
         let CreateAccountOpts {
             did,
@@ -1020,6 +1023,7 @@ pub mod helpers;
 impl<'r> FromRequest<'r> for AccountManager {
     type Error = ();
 
+    #[tracing::instrument(skip_all)]
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         match req.rocket().state::<SharedAccountManager>() {
             None => Outcome::Error((Status::InternalServerError, ())),

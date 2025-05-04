@@ -15,6 +15,7 @@ use rsky_lexicon::app::bsky::actor::ProfileViewDetailed;
 
 const METHOD_NSID: &str = "app.bsky.actor.getProfile";
 
+#[tracing::instrument(skip_all)]
 pub async fn inner_get_profile(
     // Forwarded by original url in pipethrough
     _actor: String,
@@ -27,8 +28,12 @@ pub async fn inner_get_profile(
 ) -> Result<ReadAfterWriteResponse<ProfileViewDetailed>, ApiError> {
     let requester: Option<String> = auth.access.credentials.did;
     match requester {
-        None => Ok(ReadAfterWriteResponse::HandlerPipeThrough(res)),
+        None => {
+            tracing::info!("Read after Write No Requester");
+            Ok(ReadAfterWriteResponse::HandlerPipeThrough(res))
+        }
         Some(requester) => {
+            tracing::info!("Read after Write");
             let read_afer_write_response = handle_read_after_write(
                 METHOD_NSID.to_string(),
                 requester,
@@ -47,7 +52,7 @@ pub async fn inner_get_profile(
 
 /// Get detailed profile view of an actor. Does not require auth,
 /// but contains relevant metadata with auth.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(auth, res, s3_config, state_local_viewer, cfg, db, account_manager))]
 #[rocket::get("/xrpc/app.bsky.actor.getProfile?<actor>")]
 pub async fn get_profile(
     // Handle or DID of account to fetch profile of.
@@ -61,7 +66,10 @@ pub async fn get_profile(
     account_manager: AccountManager,
 ) -> Result<ReadAfterWriteResponse<ProfileViewDetailed>, ApiError> {
     match cfg.bsky_app_view {
-        None => Err(ApiError::AccountNotFound),
+        None => {
+            tracing::error!("No bsky app view found");
+            Err(ApiError::AccountNotFound)
+        }
         Some(_) => {
             match inner_get_profile(
                 actor,
@@ -81,6 +89,7 @@ pub async fn get_profile(
     }
 }
 
+#[tracing::instrument(skip_all)]
 pub fn get_profile_munge(
     local_viewer: LocalViewer,
     original: ProfileViewDetailed,
@@ -88,9 +97,14 @@ pub fn get_profile_munge(
     requester: String,
 ) -> Result<ProfileViewDetailed> {
     match local.profile {
-        None => Ok(original),
+        None => {
+            tracing::info!("No local profile");
+            Ok(original)
+        }
         Some(profile) => {
+            tracing::info!("Local profile found");
             if original.did != requester {
+                tracing::info!("Local profile does not match requester");
                 return Ok(original);
             }
             Ok(local_viewer.update_profile_detailed(original, profile.record))

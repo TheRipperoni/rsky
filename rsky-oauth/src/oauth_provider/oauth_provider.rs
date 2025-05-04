@@ -433,6 +433,7 @@ impl OAuthProvider {
             Some(dpop_secret) => Some(DpopManagerOptions {
                 dpop_secret: Some(dpop_secret),
                 dpop_step: options.dpop_step,
+                expiration_time: None,
             }),
         };
         let verifier_opts = OAuthVerifierOptions {
@@ -738,8 +739,8 @@ impl OAuthProvider {
                     // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-11#section-4.1.2.1
                     Some(OAuthError::AccessDeniedError(
                         params.clone(),
-                        "invalid_request".to_string(),
                         None,
+                        "invalid_request".to_string(),
                     ))
                 } else {
                     None
@@ -842,8 +843,8 @@ impl OAuthProvider {
                                 self.delete_request(uri).await?;
                                 return Err(OAuthError::AccessDeniedError(
                                     parameters,
-                                    "invalid_request".to_string(),
                                     None,
+                                    "invalid_request".to_string(),
                                 ));
                             }
                         };
@@ -1002,11 +1003,7 @@ impl OAuthProvider {
             Ok(res) => res,
             Err(e) => {
                 self.delete_request(uri).await?;
-                return Err(OAuthError::AccessDeniedError(
-                    parameters,
-                    "".to_string(),
-                    None,
-                ));
+                return Err(e);
             }
         };
         let account = result.account;
@@ -1014,7 +1011,11 @@ impl OAuthProvider {
 
         // The user is trying to authorize without a fresh login
         if self.login_required(&info) {
-            return Err(OAuthError::LoginRequiredError(parameters, None));
+            self.delete_request(uri).await?;
+            return Err(OAuthError::LoginRequiredError(
+                parameters,
+                Some("Account authentication required.".to_string()),
+            ));
         }
 
         let code = match self
@@ -1025,11 +1026,7 @@ impl OAuthProvider {
             Ok(res) => res,
             Err(e) => {
                 self.delete_request(uri).await?;
-                return Err(OAuthError::AccessDeniedError(
-                    parameters,
-                    "".to_string(),
-                    None,
-                ));
+                return Err(e);
             }
         };
 
@@ -1445,7 +1442,7 @@ mod tests {
             device_id: DeviceId,
             data: DeviceData,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn read_device(
@@ -1453,7 +1450,7 @@ mod tests {
             device_id: DeviceId,
         ) -> Pin<Box<dyn Future<Output = Result<Option<DeviceData>, OAuthError>> + Send + Sync + '_>>
         {
-            unimplemented!()
+            panic!()
         }
 
         fn update_device(
@@ -1461,14 +1458,14 @@ mod tests {
             device_id: DeviceId,
             data: PartialDeviceData,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn delete_device(
             &mut self,
             device_id: DeviceId,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
     }
 
@@ -1479,7 +1476,7 @@ mod tests {
             data: TokenData,
             refresh_token: Option<RefreshToken>,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn read_token(
@@ -1487,7 +1484,7 @@ mod tests {
             token_id: TokenId,
         ) -> Pin<Box<dyn Future<Output = Result<Option<TokenInfo>, OAuthError>> + Send + Sync + '_>>
         {
-            unimplemented!()
+            panic!()
         }
 
         fn delete_token(
@@ -1515,7 +1512,7 @@ mod tests {
             new_refresh_token: RefreshToken,
             new_data: NewTokenData,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn find_token_by_refresh_token(
@@ -1596,7 +1593,7 @@ mod tests {
             code: Code,
         ) -> Pin<Box<dyn Future<Output = Result<Option<TokenInfo>, OAuthError>> + Send + Sync + '_>>
         {
-            unimplemented!()
+            panic!()
         }
     }
 
@@ -1799,13 +1796,13 @@ mod tests {
 
     impl ClientStore for TestStore {
         fn find_client(&self, client_id: OAuthClientId) -> Result<OAuthClientMetadata, OAuthError> {
-            unimplemented!()
+            panic!()
         }
     }
 
     impl ReplayStore for TestStore {
         fn unique(&mut self, namespace: &str, nonce: &str, timeframe: f64) -> bool {
-            unimplemented!()
+            panic!()
         }
     }
 

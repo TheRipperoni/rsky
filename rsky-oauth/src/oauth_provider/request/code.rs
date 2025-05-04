@@ -57,16 +57,24 @@ mod tests {
 
     #[test]
     fn test_code() {
-        let code = Code::new("cod-dwadwdaddwadwdaddwadwdaddwadwdad").unwrap();
-        assert_eq!(code.into_inner(), "cod-dwadwdaddwadwdaddwadwdaddwadwdad");
+        let code =
+            Code::new("cod-2fe27accba2e80759d069825d88af324fe0f8c8f9b0e4b67a70b1b624649d78c")
+                .unwrap();
+        assert_eq!(
+            code.into_inner(),
+            "cod-2fe27accba2e80759d069825d88af324fe0f8c8f9b0e4b67a70b1b624649d78c"
+        );
         let code = Code::generate();
         let val = code.into_inner();
         Code::new(val).unwrap();
 
-        let invalid_format_code = Code::new("aaaadwadwdaddwadwdad").unwrap_err();
+        let invalid_format_code =
+            Code::new("djaw2fe27accba2e80759d069825d88af324fe0f8c8f9b0e4b67a70b1b624649d78c")
+                .unwrap_err();
         assert_eq!(invalid_format_code, CodeError::InvalidFormat);
 
-        let invalid_length = Code::new("cod-dwadwda").unwrap_err();
+        let invalid_length =
+            Code::new("cod-2fe27accba2e80759d069825d88af324fe0f8c8f9b0e").unwrap_err();
         assert_eq!(invalid_length, CodeError::InvalidLength);
     }
 }

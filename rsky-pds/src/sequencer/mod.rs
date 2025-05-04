@@ -1,24 +1,27 @@
 use crate::account_manager::helpers::account::AccountStatus;
 use crate::actor_store::repo::types::SyncEvtData;
 use crate::crawlers::Crawlers;
-use crate::db::establish_connection_for_sequencer;
-use crate::models;
+use crate::db::{establish_connection_for_sequencer, DbConn};
 use crate::sequencer::events::{
     format_seq_account_evt, format_seq_commit, format_seq_handle_update, format_seq_identity_evt,
-    SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedIdentityEvt, TypedSyncEvt,
+    SeqEvt, TypedAccountEvt, TypedCommitEvt, TypedHandleEvt, TypedIdentityEvt, TypedSyncEvt,
 };
 use crate::EVENT_EMITTER;
+use crate::{models, SharedSequencer};
 use anyhow::Result;
 use diesel::*;
 use events::format_seq_sync_evt;
 use futures::{Stream, StreamExt};
+use rocket::request::FromRequest;
 use rsky_common::time::SECOND;
 use rsky_common::{cbor_to_struct, wait};
 use rsky_repo::types::CommitDataWithOps;
 use std::cmp;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
+#[derive(Debug)]
 pub struct RequestSeqRangeOpts {
     pub earliest_seq: Option<i64>,
     pub latest_seq: Option<i64>,
@@ -33,16 +36,18 @@ pub struct Sequencer {
     pub waker: Option<Waker>,
     pub crawlers: Crawlers,
     pub last_seen: Option<i64>,
+    pub db_url: String,
 }
 
 impl Sequencer {
-    pub fn new(crawlers: Crawlers, last_seen: Option<i64>) -> Self {
+    pub fn new(crawlers: Crawlers, last_seen: Option<i64>, db_url: String) -> Self {
         Sequencer {
             destroyed: false,
             tries_with_no_results: 0,
             last_seen: Some(last_seen.unwrap_or(0)),
             waker: None,
             crawlers,
+            db_url,
         }
     }
 
@@ -67,7 +72,7 @@ impl Sequencer {
 
     pub async fn curr(&self) -> Result<Option<i64>> {
         use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
-        let conn = &mut establish_connection_for_sequencer()?;
+        let conn = &mut establish_connection_for_sequencer(self.db_url.as_str())?;
 
         let got = RepoSeqSchema::repo_seq
             .select(models::RepoSeq::as_select())
@@ -82,7 +87,7 @@ impl Sequencer {
 
     pub async fn next_seq(&self, cursor: i64) -> Result<Option<models::RepoSeq>> {
         use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
-        let conn = &mut establish_connection_for_sequencer()?;
+        let conn = &mut establish_connection_for_sequencer(self.db_url.as_str())?;
 
         let got = RepoSeqSchema::repo_seq
             .filter(RepoSeqSchema::seq.gt(cursor))
@@ -95,7 +100,7 @@ impl Sequencer {
 
     pub async fn earliest_after_time(&self, time: String) -> Result<Option<models::RepoSeq>> {
         use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
-        let conn = &mut establish_connection_for_sequencer()?;
+        let conn = &mut establish_connection_for_sequencer(self.db_url.as_str())?;
 
         let got = RepoSeqSchema::repo_seq
             .filter(RepoSeqSchema::sequencedAt.ge(time))
@@ -106,9 +111,10 @@ impl Sequencer {
         Ok(got)
     }
 
+    #[tracing::instrument]
     pub async fn request_seq_range(&self, opts: RequestSeqRangeOpts) -> Result<Vec<SeqEvt>> {
         use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
-        let conn = &mut establish_connection_for_sequencer()?;
+        let conn = &mut establish_connection_for_sequencer(self.db_url.as_str())?;
 
         let RequestSeqRangeOpts {
             earliest_seq,
@@ -178,8 +184,16 @@ impl Sequencer {
                             evt: cbor_to_struct(row.event)?,
                         }));
                     }
+                    "handle" => {
+                        seq_evts.push(SeqEvt::TypedHandleEvt(TypedHandleEvt {
+                            r#type: "handle".to_string(),
+                            seq,
+                            time,
+                            evt: cbor_to_struct(row.event)?,
+                        }));
+                    }
                     _ => {
-                        eprintln!("ERROR: request_seq_range invalid event type");
+                        tracing::error!("ERROR: request_seq_range invalid event type \"{seq}\"");
                     }
                 },
             }
@@ -202,7 +216,7 @@ impl Sequencer {
 
     pub async fn sequence_evt(&mut self, evt: models::RepoSeq) -> Result<i64> {
         use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
-        let conn = &mut establish_connection_for_sequencer()?;
+        let conn = &mut establish_connection_for_sequencer(self.db_url.as_str())?;
 
         let res = insert_into(RepoSeqSchema::repo_seq)
             .values((
@@ -304,18 +318,21 @@ impl Stream for Sequencer {
     }
 }
 
-pub async fn delete_all_for_user(did: &String, excluding_seqs: Option<Vec<i64>>) -> Result<()> {
+pub async fn delete_all_for_user(
+    did: &String,
+    excluding_seqs: Option<Vec<i64>>,
+    db: DbConn,
+) -> Result<()> {
     use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
-    let conn = &mut establish_connection_for_sequencer()?;
     let excluding_seqs = excluding_seqs.unwrap_or_else(|| vec![]);
 
     let mut builder = delete(RepoSeqSchema::repo_seq)
-        .filter(RepoSeqSchema::did.eq(did))
+        .filter(RepoSeqSchema::did.eq(did.clone()))
         .into_boxed();
     if excluding_seqs.len() > 0 {
         builder = builder.filter(RepoSeqSchema::seq.ne_all(excluding_seqs));
     }
-    builder.execute(conn)?;
+    db.run(move |conn| builder.execute(conn)).await?;
     Ok(())
 }
 

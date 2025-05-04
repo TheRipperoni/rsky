@@ -6,7 +6,7 @@ resolver = "2"
 cargo = { version = "0.84.0",features = ["vendored-openssl"] }
 serde = { version = "1.0.160", features = ["derive"] }
 serde_derive = "^1.0"
-serde_ipld_dagcbor = {  version = "0.6.1" ,features = ["codec"]}
+#serde_ipld_dagcbor = {  version = "0.6.3" ,features = ["codec"]}
 lexicon_cid = { package = "cid", version = "0.10.1", features = ["serde-codec"] }
 libipld = "0.16.0"
 serde_cbor = "0.11.2"
@@ -17,11 +17,12 @@ rand = "0.8.5"
 rand_core = "0.6.4"
 secp256k1 = { version = "0.28.2", features = ["global-context", "serde", "rand", "hashes","rand-std"] }
 serde_json = { version = "1.0.96",features = ["preserve_order"] }
-rsky-lexicon = {path = "rsky-lexicon", version = "0.2.7"}
+rsky-lexicon = { path = "rsky-lexicon", version = "0.2.8" }
 rsky-identity = {path = "rsky-identity", version = "0.1.0"}
 rsky-crypto = {path = "rsky-crypto", version = "0.1.1"}
 rsky-syntax = {path = "rsky-syntax", version = "0.1.0"}
 rsky-common = {path = "rsky-common", version = "0.1.1"}
+serde_ipld_dagcbor = { version = "0.6.1", features = ["codec"] }
 rsky-repo = {path = "rsky-repo", version = "0.0.1"}
 rsky-firehose = {path = "rsky-firehose", version = "0.2.0"}
 rsky-oauth = { path = "rsky-oauth", version = "0.1.0" }

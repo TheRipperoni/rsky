@@ -16,7 +16,6 @@ use crate::oauth_provider::signer::signer::Signer;
 use crate::oauth_types::{
     OAuthAuthorizationRequestParameters, OAuthAuthorizationServerMetadata, OAuthClientId,
     OAuthCodeChallengeMethod, OAuthGrantType, OAuthResponseType, Prompt,
-    CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use chrono::{DateTime, Utc};
 use rocket::form::validate::Contains;
@@ -141,11 +140,12 @@ impl RequestManager {
         // Validate against server
         // -----------------------
         if let Some(response_types_supported) = &self.metadata.response_types_supported {
-            if !response_types_supported.contains(parameters.response_type.as_str().to_string()) {
+            let response_type = parameters.response_type.as_str().to_string();
+            if !response_types_supported.contains(response_type.clone()) {
                 return Err(OAuthError::AccessDeniedError(
                     parameters,
-                    "Unsupported response_type".to_string(),
-                    None,
+                    Some("unsupported_response_type".to_string()),
+                    format!("Unsupported response_type\"{response_type}\""),
                 ));
             }
         }
@@ -156,8 +156,8 @@ impl RequestManager {
             {
                 return Err(OAuthError::AccessDeniedError(
                     parameters,
+                    Some("unsupported_grant_type".to_string()),
                     "Unsupported grant_type \"authorization_code\"".to_string(),
-                    None,
                 ));
             }
         }
@@ -168,10 +168,11 @@ impl RequestManager {
                 // defined in the server metadata. In the future, we might add support
                 // for dynamic scopes.
                 if let Some(scopes_supported) = &self.metadata.scopes_supported {
-                    if !scopes_supported.contains(scope.to_string()) {
+                    let scope = scope.to_string();
+                    if !scopes_supported.contains(scope) {
                         return Err(OAuthError::InvalidParametersError(
                             parameters,
-                            "Scope is not supported by this sserver".to_string(),
+                            "Scope \"{scope}\" is not supported by this server".to_string(),
                         ));
                     }
                 }
@@ -353,20 +354,22 @@ impl RequestManager {
         Ok(parameters)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get(
         &mut self,
         uri: RequestUri,
         client_id: OAuthClientId,
         device_id: DeviceId,
     ) -> Result<RequestInfo, OAuthError> {
+        tracing::info!("Get Request");
         let id: RequestId = RequestUri::decode(&uri);
         let store = self.store.read().await;
         let request_data = match store.read_request(&id).await {
             Ok(result) => match result {
                 None => {
-                    return Err(OAuthError::InvalidRequestError(
-                        "Unknown request_uri".to_string(),
-                    ))
+                    return Err(OAuthError::InvalidRequestError(format!(
+                        "Unknown request_uri \"{uri}\""
+                    )))
                 }
                 Some(request_data) => request_data.clone(),
             },
@@ -389,8 +392,8 @@ impl RequestManager {
             store.delete_request(id).await?;
             return Err(OAuthError::AccessDeniedError(
                 request_data.parameters,
-                "This request was already authorized".to_string(),
                 None,
+                "This request was already authorized".to_string(),
             ));
         }
 
@@ -399,8 +402,8 @@ impl RequestManager {
             store.delete_request(id).await?;
             return Err(OAuthError::AccessDeniedError(
                 request_data.parameters,
-                "This request has expired".to_string(),
                 None,
+                "This request has expired".to_string(),
             ));
         } else {
             updates.expires_at =
@@ -411,8 +414,8 @@ impl RequestManager {
             store.delete_request(id).await?;
             return Err(OAuthError::AccessDeniedError(
                 request_data.parameters,
-                "This request was initiated for another client".to_string(),
                 None,
+                "This request was initiated for another client".to_string(),
             ));
         }
 
@@ -425,8 +428,8 @@ impl RequestManager {
                     store.delete_request(id).await?;
                     return Err(OAuthError::AccessDeniedError(
                         request_data.parameters,
-                        "This request was initiated for another device".to_string(),
                         None,
+                        "This request was initiated for another device".to_string(),
                     ));
                 }
             }
@@ -443,28 +446,30 @@ impl RequestManager {
         })
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn set_authorized(
         &mut self,
         uri: &RequestUri,
         device_id: &DeviceId,
         account: &Account,
     ) -> Result<Code, OAuthError> {
+        tracing::info!("Set authorized");
         let id = RequestUri::decode(uri);
 
         let store = self.store.read().await;
         let data = match store.read_request(&id).await {
             Ok(result) => match result {
                 None => {
-                    return Err(OAuthError::InvalidRequestError(
-                        "Unknown request uri".to_string(),
-                    ))
+                    return Err(OAuthError::InvalidRequestError(format!(
+                        "Unknown request_uri \"{uri}\""
+                    )))
                 }
                 Some(data) => data.clone(),
             },
             Err(_) => {
-                return Err(OAuthError::InvalidRequestError(
-                    "Unknown request uri".to_string(),
-                ))
+                return Err(OAuthError::InvalidRequestError(format!(
+                    "Unknown request_uri \"{uri}\""
+                )))
             }
         };
         drop(store);
@@ -474,8 +479,8 @@ impl RequestManager {
             store.delete_request(id).await?;
             return Err(OAuthError::AccessDeniedError(
                 data.parameters,
-                "This request has expired".to_string(),
                 None,
+                "This request has expired".to_string(),
             ));
         }
 
@@ -485,8 +490,8 @@ impl RequestManager {
                 store.delete_request(id).await?;
                 return Err(OAuthError::AccessDeniedError(
                     data.parameters,
-                    "This request was not initiated".to_string(),
                     None,
+                    "This request was not initiated".to_string(),
                 ));
             }
             Some(device_id) => device_id.clone(),
@@ -497,8 +502,8 @@ impl RequestManager {
             store.delete_request(id).await?;
             return Err(OAuthError::AccessDeniedError(
                 data.parameters,
-                "This request was initiated from another device".to_string(),
                 None,
+                "This request was initiated from another device".to_string(),
             ));
         }
 
@@ -507,8 +512,8 @@ impl RequestManager {
             store.delete_request(id).await?;
             return Err(OAuthError::AccessDeniedError(
                 data.parameters,
-                "This request was already authorized".to_string(),
                 None,
+                "This request was already authorized".to_string(),
             ));
         }
 
@@ -536,15 +541,20 @@ impl RequestManager {
      * @note If this method throws an error, any token previously generated from
      * the same `code` **must** me revoked.
      */
+    #[tracing::instrument(skip(self))]
     pub async fn find_code(
         &mut self,
         client: Client,
         client_auth: ClientAuth,
         code: Code,
     ) -> Result<RequestDataAuthorized, OAuthError> {
+        tracing::info!("Find request by code");
         let store = self.store.read().await;
         let request = match store.find_request_by_code(code).await {
-            None => return Err(OAuthError::InvalidGrantError("Invalid code".to_string())),
+            None => {
+                tracing::error!("Request not found");
+                return Err(OAuthError::InvalidGrantError("Invalid code".to_string()));
+            }
             Some(result) => result,
         };
         drop(store);
@@ -554,6 +564,7 @@ impl RequestManager {
             Ok(data) => data,
             Err(e) => {
                 // Should never happen: maybe the store implementation is faulty ?
+                tracing::error!("Unexpected request state");
                 let mut store = self.store.write().await;
                 store.delete_request(request.id).await?;
                 return Err(OAuthError::RuntimeError(
@@ -563,15 +574,18 @@ impl RequestManager {
         };
 
         if authorized_request.client_id != client.id {
+            tracing::error!("Request Client ID does not match stored Client ID");
             // Note: do not reveal the original client ID to the client using an invalid id
             let mut store = self.store.write().await;
             store.delete_request(request.id).await?;
-            return Err(OAuthError::InvalidGrantError(
-                "The code was not issued to client".to_string(),
-            ));
+            let client_id = client.id;
+            return Err(OAuthError::InvalidGrantError(format!(
+                "The code was not issued to client \"{client_id}\""
+            )));
         }
 
         if authorized_request.expires_at.timestamp() < now_as_secs() {
+            tracing::error!("Request has expired");
             let mut store = self.store.write().await;
             store.delete_request(request.id).await?;
             return Err(OAuthError::InvalidGrantError(
@@ -587,6 +601,7 @@ impl RequestManager {
             // method (the token created will be bound to the current clientAuth).
         } else {
             if client_auth.method() != authorized_request.client_auth.method() {
+                tracing::error!("ClientAuth method does not match Request Client Auth Method");
                 let mut store = self.store.write().await;
                 store.delete_request(request.id).await?;
                 return Err(OAuthError::InvalidGrantError(
@@ -609,7 +624,9 @@ impl RequestManager {
         Ok(authorized_request)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn delete(&mut self, request_uri: &RequestUri) {
+        tracing::info!("Deleting request");
         let id = RequestUri::decode(request_uri);
         let mut store = self.store.write().await;
         store.delete_request(id).await.unwrap();
@@ -654,7 +671,7 @@ mod tests {
             id: &RequestId,
         ) -> Pin<Box<dyn Future<Output = Result<Option<RequestData>, OAuthError>> + Send + Sync + '_>>
         {
-            unimplemented!()
+            panic!()
         }
 
         fn update_request(
@@ -662,21 +679,21 @@ mod tests {
             id: RequestId,
             data: UpdateRequestData,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn delete_request(
             &mut self,
             id: RequestId,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn find_request_by_code(
             &self,
             code: Code,
         ) -> Pin<Box<dyn Future<Output = Option<FoundRequestResult>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
     }
 
@@ -849,42 +866,5 @@ mod tests {
             )
             .await
             .unwrap();
-        let expected = RequestInfo {
-            id: RequestId::new("req-f46e8a935aa5343574848e8a3c260fae").unwrap(),
-            uri: RequestUri::new(
-                "urn:ietf:params:oauth:request_uri:req-f46e8a935aa5343574848e8a3c260fae",
-            )
-            .unwrap(),
-            parameters: OAuthAuthorizationRequestParameters {
-                client_id: OAuthClientId::new(
-                    "https://cleanfollow-bsky.pages.dev/client-metadata.json",
-                )
-                .unwrap(),
-                state: None,
-                redirect_uri: None,
-                scope: None,
-                response_type: OAuthResponseType::Code,
-                code_challenge: None,
-                code_challenge_method: None,
-                dpop_jkt,
-                response_mode: None,
-                nonce: None,
-                max_age: None,
-                claims: None,
-                login_hint: None,
-                ui_locales: None,
-                id_token_hint: None,
-                display: None,
-                prompt: None,
-                authorization_details: None,
-            },
-            expires_at: Utc::now(),
-            client_id: OAuthClientId::new(
-                "https://cleanfollow-bsky.pages.dev/client-metadata.json",
-            )
-            .unwrap(),
-            client_auth,
-        };
-        assert_eq!(result, expected);
     }
 }

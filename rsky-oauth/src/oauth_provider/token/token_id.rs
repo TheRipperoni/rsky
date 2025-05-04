@@ -99,16 +99,20 @@ mod tests {
 
     #[test]
     fn test_token_id() {
-        let token_id = TokenId::new("tok-dwadwdaddwadwdad").unwrap();
-        assert_eq!(token_id.into_inner(), "tok-dwadwdaddwadwdad");
+        let token_id = TokenId::new("tok-739361c165c76408088de74ee136cf66").unwrap();
+        assert_eq!(
+            token_id.into_inner(),
+            "tok-739361c165c76408088de74ee136cf66"
+        );
         let token_id = TokenId::generate();
         let val = token_id.into_inner();
         TokenId::new(val).unwrap();
 
-        let invalid_format_token_id = TokenId::new("aaaadwadwdaddwadwdad").unwrap_err();
+        let invalid_format_token_id =
+            TokenId::new("adad739361c165c76408088de74ee136cf66").unwrap_err();
         assert_eq!(invalid_format_token_id, TokenIdError::InvalidFormat);
 
-        let invalid_length = TokenId::new("tok-dwadwda").unwrap_err();
+        let invalid_length = TokenId::new("tok-739361c165c76408088de74ee136").unwrap_err();
         assert_eq!(invalid_length, TokenIdError::InvalidLength);
     }
 }

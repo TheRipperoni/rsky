@@ -14,9 +14,10 @@ use rsky_syntax::aturi::AtUri;
 use rsky_syntax::aturi_validation::ensure_valid_at_uri;
 use rsky_syntax::did::ensure_valid_did;
 use serde_json::Value as JsonValue;
-use std::env;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::{env, fmt};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GetRecord {
@@ -27,6 +28,20 @@ pub struct GetRecord {
     pub indexed_at: String,
     #[serde(rename = "takedownRef")]
     pub takedown_ref: Option<String>,
+}
+
+impl Display for GetRecord {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{uri: {0}, cid: {1}, value: {2}, indexed_at: {3}, takedown_ref: {4} }}",
+            self.uri,
+            self.cid,
+            "ObfuscatedValue".to_string(),
+            self.indexed_at,
+            self.takedown_ref.clone().unwrap_or("N/A".to_string())
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -181,6 +196,7 @@ impl RecordReader {
             .collect::<Result<Vec<RecordsForCollection>>>()
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn get_record(
         &mut self,
         uri: &AtUri,
@@ -201,9 +217,11 @@ impl RecordReader {
             .filter(RecordSchema::uri.eq(uri.to_string()))
             .into_boxed();
         if !include_soft_deleted {
+            tracing::info!("Omit soft deleted");
             builder = builder.filter(RecordSchema::takedownRef.is_null());
         }
         if let Some(cid) = cid {
+            tracing::info!("Required CID");
             builder = builder.filter(RecordSchema::cid.eq(cid));
         }
         let record: Option<(models::Record, models::RepoBlock)> = self
@@ -211,6 +229,7 @@ impl RecordReader {
             .run(move |conn| builder.first(conn).optional())
             .await?;
         if let Some(record) = record {
+            tracing::info!("Record found");
             Ok(Some(GetRecord {
                 uri: record.0.uri,
                 cid: record.0.cid,
@@ -219,6 +238,7 @@ impl RecordReader {
                 takedown_ref: record.0.takedown_ref,
             }))
         } else {
+            tracing::info!("Record not found");
             Ok(None)
         }
     }
@@ -513,5 +533,24 @@ impl RecordReader {
                 Ok(())
             })
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test() {
+        let uri = AtUri::make(
+            "did:plc:v7zar32lirxpjznnznz2cfkj".to_string(),
+            Some("app.bsky.actor.profile".to_string()),
+            Some("self".to_string()),
+        )
+        .unwrap();
+        assert_eq!(
+            uri.to_string(),
+            "at://did:plc:v7zar32lirxpjznnznz2cfkj/app.bsky.actor.profile/self".to_string()
+        )
     }
 }

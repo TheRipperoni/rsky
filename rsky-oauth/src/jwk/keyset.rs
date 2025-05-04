@@ -1,6 +1,7 @@
 use crate::jwk::key::Key;
 use crate::jwk::{
     algorithm_as_string, JwkError, JwtHeader, JwtPayload, SignedJwt, VerifyOptions, VerifyResult,
+    ERR_JWKS_NO_MATCHING_KEY, ERR_JWT_INVALID,
 };
 use biscuit::jwa::{Algorithm, SignatureAlgorithm};
 use biscuit::jwk::{PublicKeyUse, JWK};
@@ -195,6 +196,7 @@ impl Keyset {
         key.create_jwt(header, jwt_payload).await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn verify_jwt(
         &self,
         signed_jwt: SignedJwt,
@@ -227,13 +229,13 @@ impl Keyset {
 
         if errors.is_empty() {
             Err(JwkError::JwtVerifyError(
-                "ERR_JWKS_NO_MATCHING_KEY".to_string(),
+                ERR_JWKS_NO_MATCHING_KEY.to_string(),
             ))
         } else if errors.len() == 1 {
-            println!("{}", errors.get(0).unwrap());
-            Err(JwkError::JwtVerifyError("ERR_JWT_INVALID".to_string()))
+            tracing::error!("{}", errors.get(0).unwrap());
+            Err(JwkError::JwtVerifyError(ERR_JWT_INVALID.to_string()))
         } else {
-            Err(JwkError::JwtVerifyError("ERR_JWT_INVALID".to_string()))
+            Err(JwkError::JwtVerifyError(ERR_JWT_INVALID.to_string()))
         }
     }
 }

@@ -7,6 +7,8 @@ use rocket::http::{ContentType, Header, Status};
 use rocket::request::FromParam;
 use rocket::serde::json::Json;
 use rocket::{response, Data, Request, Responder};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Responder)]
 #[response(status = 200)]
@@ -104,6 +106,13 @@ pub enum ApiError {
     BlobNotFound,
     BadRequest(String, String),
     AuthRequiredError(String),
+    HandleNotFound(String),
+}
+
+impl Display for ApiError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "ApiError")
+    }
 }
 
 #[derive(Serialize)]
@@ -357,6 +366,17 @@ impl<'r, 'o: 'r> ::rocket::response::Responder<'r, 'o> for ApiError {
                     <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
                 res.set_header(ContentType::JSON);
                 res.set_status(Status { code: 404u16 });
+                Ok(res)
+            }
+            ApiError::HandleNotFound(message) => {
+                let body = Json(ErrorBody {
+                    error: "HandleNotFound".to_string(),
+                    message,
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
                 Ok(res)
             }
         }

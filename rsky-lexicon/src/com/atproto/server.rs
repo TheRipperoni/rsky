@@ -176,10 +176,11 @@ pub struct GetSessionOutput {
     pub email_confirmed: Option<bool>,
     #[serde(rename = "didDoc", skip_serializing_if = "Option::is_none")]
     pub did_doc: Option<String>,
+    pub active: bool,
 }
 
 /// Describes the server's account creation requirements and capabilities. Implemented by PDS.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
 pub struct DescribeServerOutput {
     /// If true, an invite code must be supplied to create an account on this instance.
     #[serde(rename = "inviteCodeRequired", skip_serializing_if = "Option::is_none")]
@@ -281,7 +282,7 @@ pub struct InviteCodeUse {
     pub used_at: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
 pub struct DescribeServerRefLinks {
     #[serde(rename = "privacyPolicy", skip_serializing_if = "Option::is_none")]
     pub privacy_policy: Option<String>,
@@ -289,7 +290,7 @@ pub struct DescribeServerRefLinks {
     pub terms_of_service: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
 pub struct DescribeServerRefContact {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,

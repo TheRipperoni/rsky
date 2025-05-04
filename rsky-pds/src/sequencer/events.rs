@@ -165,7 +165,7 @@ pub struct TypedAccountEvt {
 #[serde(untagged)]
 pub enum SeqEvt {
     TypedCommitEvt(TypedCommitEvt),
-    // TypedHandleEvt(TypedHandleEvt),
+    TypedHandleEvt(TypedHandleEvt),
     TypedIdentityEvt(TypedIdentityEvt),
     TypedAccountEvt(TypedAccountEvt),
     // TypedTombstoneEvt(TypedTombstoneEvt),
@@ -211,6 +211,7 @@ impl SeqEvt {
             SeqEvt::TypedIdentityEvt(this) => this.seq,
             SeqEvt::TypedAccountEvt(this) => this.seq,
             SeqEvt::TypedSyncEvt(this) => this.seq,
+            SeqEvt::TypedHandleEvt(this) => this.seq,
         }
     }
 }

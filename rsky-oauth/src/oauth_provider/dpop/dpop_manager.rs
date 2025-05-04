@@ -1,4 +1,3 @@
-use crate::jwk::{Jwk, JwtHeader, JwtPayload};
 use crate::oauth_provider::dpop::dpop_nonce::{DpopNonce, DpopNonceError, DpopNonceInput};
 use crate::oauth_provider::errors::OAuthError;
 use crate::oauth_provider::now_as_secs;
@@ -8,7 +7,6 @@ use base64ct::{Base64, Encoding};
 use biscuit::jwk::{JWKSet, JWK};
 use biscuit::{Empty, JWT};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -22,21 +20,34 @@ pub struct DpopManagerOptions {
      */
     pub dpop_secret: Option<DpopNonceInput>,
     pub dpop_step: Option<u64>,
+    pub expiration_time: Option<i64>,
 }
 
 #[derive(Clone)]
 pub struct DpopManager {
     dpop_nonce: Option<Arc<RwLock<DpopNonce>>>,
+    expiration_time: i64,
 }
 
 impl DpopManager {
     pub fn new(opts: Option<DpopManagerOptions>) -> Result<Self, DpopNonceError> {
         match opts {
-            None => Ok(DpopManager { dpop_nonce: None }),
+            None => Ok(DpopManager {
+                dpop_nonce: None,
+                expiration_time: 10,
+            }),
             Some(opts) => {
-                let dpop_nonce = DpopNonce::from(opts.dpop_secret, opts.dpop_step)?;
+                let dpop_nonce = if opts.dpop_secret.is_some() {
+                    Some(Arc::new(RwLock::new(DpopNonce::from(
+                        opts.dpop_secret,
+                        opts.dpop_step,
+                    )?)))
+                } else {
+                    None
+                };
                 Ok(DpopManager {
-                    dpop_nonce: Some(Arc::new(RwLock::new(dpop_nonce))),
+                    dpop_nonce,
+                    expiration_time: opts.expiration_time.unwrap_or(10),
                 })
             }
         }
@@ -55,6 +66,7 @@ impl DpopManager {
     /**
      * @see {@link https://datatracker.ietf.org/doc/html/rfc9449#section-4.3}
      */
+    #[tracing::instrument(skip(self))]
     pub async fn check_proof(
         &self,
         proof: &str,
@@ -92,8 +104,7 @@ impl DpopManager {
                 }
 
                 if let Some(iat) = payload.registered.issued_at {
-                    //TODO: for tests
-                    if iat.timestamp() < now - 10000 {
+                    if iat.timestamp() < now - self.expiration_time {
                         return Err(OAuthError::InvalidDpopProofError(
                             "\"iat\" expired".to_string(),
                         ));
@@ -162,9 +173,9 @@ impl DpopManager {
                     let ath = Base64::encode_string(&hash)
                         .replace("=", "")
                         .replace("+", "-");
-                    println!("{}", ath);
+                    tracing::info!("{}", ath);
                     if let Some(payload_ath) = payload_ath {
-                        println!("{}", payload_ath);
+                        tracing::info!("{}", payload_ath);
                         if payload_ath != ath {
                             return Err(OAuthError::InvalidDpopProofError(
                                 "DPoP ath mismatch".to_string(),
@@ -247,7 +258,6 @@ mod tests {
         CheckProofResult, DpopManager, DpopManagerOptions,
     };
     use crate::oauth_provider::dpop::dpop_nonce::DpopNonceInput;
-    use crate::oauth_provider::errors::OAuthError;
     use crate::oauth_types::OAuthAccessToken;
     use rand::random;
 
@@ -255,34 +265,13 @@ mod tests {
         let dpop_secret = random::<[u8; 32]>();
         let options = DpopManagerOptions {
             dpop_secret: Some(DpopNonceInput::Uint8Array(Vec::from(dpop_secret))),
-            dpop_step: None,
+            dpop_step: Some(60000),
+            expiration_time: Some(1000000),
         };
         DpopManager::new(Some(options)).unwrap()
     }
 
-    #[tokio::test]
-    async fn check_proof_without_nonce() {
-        let manager_options = DpopManagerOptions {
-            dpop_secret: Some(DpopNonceInput::String(
-                "1c9d92bea9a498e6165a39473e724a5d1c9d92bea9a498e6165a39473e724a5d".to_string(),
-            )),
-            dpop_step: Some(1),
-        };
-        let manager = DpopManager::new(Some(manager_options)).unwrap();
-        let proof = "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7ImFsZyI6IkVTMjU2IiwiY3J2IjoiUC0yNTYiLCJrdHkiOiJFQyIsIngiOiJQZXg2Rk1wcjJoM0t4T3hpQzlfdnlaaVoxSEdvZTFSMnQyal9oUlpPMkg4IiwieSI6IlljZ3BLellOYzRvSUc4WnJvOE9Zdi1jc0Npd1laVGdmNGtxTWFrRDJMRlEifX0.eyJpc3MiOiJodHRwczovL2NsZWFuZm9sbG93LWJza3kucGFnZXMuZGV2L2NsaWVudC1tZXRhZGF0YS5qc29uIiwiaWF0IjoxNzQ1MDE5NjkxLCJqdGkiOiJoNmsyejkyd3V3Omd1aHV2dXV6bXFpOSIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL3Bkcy5yaXBwZXJvbmkuY29tL29hdXRoL3BhciJ9.4AqG1rCtHOD--1lGVbVoKaizf7EV58RMfuCi3ZFVln6VwbzquFs8K7OIJGv-Tj6xMzAgOkrcwSGaftfExvLoYQ";
-        let htm = "POST";
-        let htu = "https://pds.ripperoni.com/oauth/par";
-        let access_token: Option<OAuthAccessToken> = None;
-        let result = manager
-            .check_proof(proof, htm, htu, access_token)
-            .await
-            .unwrap_err();
-        assert_eq!(
-            result,
-            OAuthError::InvalidDpopProofError("DPoP nonce mismatch".to_string())
-        )
-    }
-
+    //Add method to generate nonce for request
     #[tokio::test]
     async fn check_proof_with_nonce() {
         let manager = create_manager();

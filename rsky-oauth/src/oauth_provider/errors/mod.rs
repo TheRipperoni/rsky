@@ -1,3 +1,4 @@
+use crate::oauth_types::OAuthTokenType::DPoP;
 use crate::oauth_types::{OAuthAuthorizationRequestParameters, OAuthTokenType};
 use rocket::http::{ContentType, Status};
 use rocket::serde::json::Json;
@@ -6,7 +7,7 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OAuthError {
-    AccessDeniedError(OAuthAuthorizationRequestParameters, String, Option<String>),
+    AccessDeniedError(OAuthAuthorizationRequestParameters, Option<String>, String),
     AccountSelectionRequiredError(OAuthAuthorizationRequestParameters, Option<String>),
     ConsentRequiredError(OAuthAuthorizationRequestParameters, Option<String>),
     /**
@@ -142,7 +143,6 @@ pub enum OAuthError {
     RuntimeError(String),
     InvalidClientAuthMethod(String),
     JwtVerifyError(String),
-    WwwAuthenticateError,
 }
 
 #[derive(Serialize)]
@@ -154,8 +154,14 @@ pub struct ErrorBody {
 impl<'r, 'o: 'r> ::rocket::response::Responder<'r, 'o> for OAuthError {
     fn respond_to(self, __req: &'r Request<'_>) -> response::Result<'o> {
         match self {
-            OAuthError::AccessDeniedError(_, _, _) => {
-                unimplemented!()
+            OAuthError::AccessDeniedError(params, error, message) => {
+                let error = error.unwrap_or("access_denied".to_string());
+                let body = Json(ErrorBody { error, message });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
+                Ok(res)
             }
             OAuthError::InvalidGrantError(error) => {
                 let body = Json(ErrorBody {
@@ -323,23 +329,63 @@ impl<'r, 'o: 'r> ::rocket::response::Responder<'r, 'o> for OAuthError {
                 res.set_status(Status { code: 400u16 });
                 Ok(res)
             }
-            OAuthError::AccountSelectionRequiredError(_, _) => {
-                unimplemented!()
+            OAuthError::AccountSelectionRequiredError(params, desc) => {
+                let error_desc = desc.unwrap_or("Account selection required".to_string());
+                let body = Json(ErrorBody {
+                    error: "account_selection_required".to_string(),
+                    message: error_desc,
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
+                Ok(res)
             }
-            OAuthError::ConsentRequiredError(_, _) => {
-                unimplemented!()
+            OAuthError::ConsentRequiredError(params, desc) => {
+                let error_desc = desc.unwrap_or("User consent required".to_string());
+                let body = Json(ErrorBody {
+                    error: "consent_required".to_string(),
+                    message: error_desc,
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
+                Ok(res)
             }
-            OAuthError::InvalidAuthorizationDetailsError(_, _) => {
-                unimplemented!()
+            OAuthError::InvalidAuthorizationDetailsError(params, error_desc) => {
+                let body = Json(ErrorBody {
+                    error: "invalid_authorization_details".to_string(),
+                    message: error_desc,
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
+                Ok(res)
             }
-            OAuthError::InvalidClientIdError(_) => {
-                unimplemented!()
+            OAuthError::InvalidClientIdError(error_desc) => {
+                let body = Json(ErrorBody {
+                    error: "invalid_client_id".to_string(),
+                    message: error_desc,
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
+                Ok(res)
             }
-            OAuthError::LoginRequiredError(_, _) => {
-                unimplemented!()
-            }
-            OAuthError::WwwAuthenticateError => {
-                unimplemented!()
+            OAuthError::LoginRequiredError(params, error_desc) => {
+                let error_desc = error_desc.unwrap_or("Login is required".to_string());
+                let body = Json(ErrorBody {
+                    error: "login_required".to_string(),
+                    message: error_desc,
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType::JSON);
+                res.set_status(Status { code: 400u16 });
+                Ok(res)
             }
         }
     }

@@ -63,6 +63,7 @@ pub struct ActorStore {
 // Combination of RepoReader/Transactor, BlobReader/Transactor, SqlRepoReader/Transactor
 impl ActorStore {
     /// Concrete reader of an individual repo (hence S3BlobStore which takes `did` param)
+    #[tracing::instrument(skip(blobstore, db))]
     pub fn new(did: String, blobstore: S3BlobStore, db: DbConn) -> Self {
         let db = Arc::new(db);
         ActorStore {
@@ -340,9 +341,9 @@ impl ActorStore {
                 .collect::<Result<Vec<RecordWriteOp>>>()?;
             // @TODO: Use repo signing key global config
             let secp = Secp256k1::new();
-            let repo_private_key = env::var("PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX").unwrap();
+            let repo_private_key = env::var("PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX")?;
             let repo_secret_key =
-                SecretKey::from_slice(&hex::decode(repo_private_key.as_bytes()).unwrap()).unwrap();
+                SecretKey::from_slice(&hex::decode(repo_private_key.as_bytes())?)?;
             let repo_signing_key = Keypair::from_secret_key(&secp, &repo_secret_key);
 
             let mut commit = repo

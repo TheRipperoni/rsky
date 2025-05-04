@@ -2,7 +2,7 @@ use crate::jwk::{JwtHeader, JwtPayload};
 use crate::oauth_types::OAuthIssuerIdentifier;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct VerifyOptions {
     pub audience: Option<String>,
     /** in seconds */

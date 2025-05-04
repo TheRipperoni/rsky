@@ -4,7 +4,6 @@ use crate::oauth_provider::client::client_info::ClientInfo;
 use crate::oauth_provider::constants::JAR_MAX_AGE;
 use crate::oauth_provider::errors::OAuthError;
 use crate::oauth_provider::lib::util::redirect_uri::compare_redirect_uri;
-use crate::oauth_provider::token::token_data::TokenData;
 use crate::oauth_types::{
     OAuthAuthorizationRequestParameters, OAuthClientCredentials, OAuthClientId,
     OAuthClientMetadata, OAuthEndpointAuthMethod, OAuthGrantType, OAuthIssuerIdentifier,
@@ -12,7 +11,6 @@ use crate::oauth_types::{
 };
 use biscuit::jwk::JWKSet;
 use biscuit::{Empty, JWT};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 /**
@@ -287,7 +285,9 @@ impl Client {
      * the client stops advertising the key that it used to authenticate itself
      * during the initial token request.
      */
+    #[tracing::instrument(skip(self))]
     pub async fn validate_client_auth(&self, client_auth: &ClientAuth) -> bool {
+        tracing::error!("expected bad state");
         if client_auth.method() == "none" {
             return match self.metadata.token_endpoint_auth_method {
                 None => false,
@@ -462,7 +462,7 @@ mod tests {
     use super::*;
     use crate::oauth_types::{
         ApplicationType, Display, OAuthClientCredentialsNone, OAuthCodeChallengeMethod,
-        OAuthResponseType, OAuthScope, Prompt, ResponseMode, ValidUri, WebUri,
+        OAuthResponseType, OAuthScope, Prompt, ResponseMode,
     };
 
     fn create_client() -> Client {

@@ -166,6 +166,23 @@ pub fn algorithm_as_string(alg: Algorithm) -> String {
     }
 }
 
+pub fn string_as_algorithm(alg: String) -> Option<SignatureAlgorithm> {
+    match alg.as_str() {
+        HS256_STR => Some(SignatureAlgorithm::HS256),
+        HS384_STR => Some(SignatureAlgorithm::HS384),
+        HS512_STR => Some(SignatureAlgorithm::HS512),
+        ES256_STR => Some(SignatureAlgorithm::ES256),
+        ES384_STR => Some(SignatureAlgorithm::ES384),
+        RS256_STR => Some(SignatureAlgorithm::RS256),
+        RS384_STR => Some(SignatureAlgorithm::RS384),
+        RS512_STR => Some(SignatureAlgorithm::RS512),
+        PS256_STR => Some(SignatureAlgorithm::PS256),
+        PS384_STR => Some(SignatureAlgorithm::PS384),
+        PS512_STR => Some(SignatureAlgorithm::PS512),
+        _ => None,
+    }
+}
+
 impl JwtToken {
     /// Create a new JWT token
     pub fn new(token: impl Into<String>) -> Result<Self, JwtError> {

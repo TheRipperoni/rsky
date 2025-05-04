@@ -78,7 +78,7 @@ async fn inner_update_handle(
     Ok(())
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(sequencer, server_config, id_resolver, auth, account_manager))]
 #[rocket::post(
     "/xrpc/com.atproto.identity.updateHandle",
     format = "json",

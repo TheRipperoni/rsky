@@ -27,7 +27,7 @@ use crate::oauth_types::{
     OAuthAuthorizationRequestParameters, OAuthClientCredentialsGrantTokenRequest, OAuthClientId,
     OAuthCodeChallengeMethod, OAuthGrantType, OAuthPasswordGrantTokenRequest,
     OAuthRefreshTokenGrantTokenRequest, OAuthTokenIdentification, OAuthTokenResponse,
-    OAuthTokenType, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    OAuthTokenType,
 };
 use base64ct::{Base64, Encoding};
 use chrono::{DateTime, Utc};
@@ -208,17 +208,16 @@ impl TokenManager {
                     if let Some(code_challenge_method) = parameters.code_challenge_method {
                         match code_challenge_method {
                             OAuthCodeChallengeMethod::S256 => {
-                                //todo
-                                // let input_challenge = code_challenge.clone();
-                                // let base64_input_challenge =
-                                //     Base64::encode_string(&input_challenge.as_bytes());
-                                // let computed_challenge =
-                                //     Base64::encode_string(&Sha256::digest(code_verifier));
-                                // if input_challenge != computed_challenge {
-                                //     return Err(OAuthError::InvalidGrantError(
-                                //         "Invalid code_verifier".to_string(),
-                                //     ));
-                                // }
+                                let input_challenge = code_challenge.clone();
+                                let base64_input_challenge =
+                                    Base64::encode_string(&input_challenge.as_bytes());
+                                let computed_challenge =
+                                    Base64::encode_string(&Sha256::digest(code_verifier));
+                                if input_challenge != computed_challenge {
+                                    return Err(OAuthError::InvalidGrantError(
+                                        "Invalid code_verifier".to_string(),
+                                    ));
+                                }
                             }
                             OAuthCodeChallengeMethod::Plain => {
                                 if code_challenge != code_verifier {
@@ -474,7 +473,7 @@ impl TokenManager {
             // In case the client metadata was updated after the token was issued
             store.delete_token(token_info.id).await?;
             return Err(OAuthError::InvalidGrantError(
-                "This client is not allowed to use the".to_string(),
+                "This client is not allowed to use the \"refresh_token\" grant type".to_string(),
             ));
         }
 
@@ -938,7 +937,7 @@ mod tests {
             new_refresh_token: RefreshToken,
             new_data: NewTokenData,
         ) -> Pin<Box<dyn Future<Output = Result<(), OAuthError>> + Send + Sync + '_>> {
-            unimplemented!()
+            panic!()
         }
 
         fn find_token_by_refresh_token(
@@ -1001,7 +1000,7 @@ mod tests {
             code: Code,
         ) -> Pin<Box<dyn Future<Output = Result<Option<TokenInfo>, OAuthError>> + Send + Sync + '_>>
         {
-            unimplemented!()
+            panic!()
         }
     }
 
@@ -1102,7 +1101,10 @@ mod tests {
         };
         let device: Option<(DeviceId, DeviceAccountInfo)> = None;
         let parameters = OAuthAuthorizationRequestParameters {
-            client_id: OAuthClientId::new("client123").unwrap(),
+            client_id: OAuthClientId::new(
+                "https://cleanfollow-bsky.pages.dev/client-metadata.json",
+            )
+            .unwrap(),
             state: None,
             redirect_uri: Some(
                 OAuthRedirectUri::new("https://cleanfollow-bsky.pages.dev/").unwrap(),

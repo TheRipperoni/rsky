@@ -56,7 +56,7 @@ async fn inner_get_record(
 
 /// Get data blocks needed to prove the existence or non-existence of record in the current version
 /// of repo. Does not require auth.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(s3_config, auth, db, account_manager))]
 #[rocket::get("/xrpc/com.atproto.sync.getRecord?<did>&<collection>&<rkey>&<commit>")]
 pub async fn get_record(
     did: String,

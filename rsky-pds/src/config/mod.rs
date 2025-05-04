@@ -5,6 +5,7 @@ use rsky_common::env::{env_bool, env_int, env_list, env_str};
 use rsky_common::time::{DAY, HOUR, SECOND};
 use rsky_oauth::oauth_provider::output::customization::Customization;
 use rsky_oauth::oauth_types::OAuthIssuerIdentifier;
+use std::env;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerConfig {
@@ -16,6 +17,7 @@ pub struct ServerConfig {
     pub invites: InvitesConfig,
     pub identity: IdentityConfig,
     pub crawlers: Vec<String>,
+    pub db_conn: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -226,6 +228,7 @@ pub fn env_to_cfg() -> ServerConfig {
         invites: invites_cfg,
         crawlers: crawlers_cfg,
         identity: identity_cfg,
+        db_conn: env::var("DATABASE_URL").unwrap_or("".into()),
     }
 }
 

@@ -121,7 +121,7 @@ pub async fn inner_get_post_thread(
 /// will be applied for authed requests.
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(s3_config, cfg, db, account_manager, res, state_local_viewer, auth))]
 #[rocket::get("/xrpc/app.bsky.feed.getPostThread?<uri>&<depth>&<parentHeight>")]
 pub async fn get_post_thread(
     uri: String,               // Reference (AT-URI) to post record.
@@ -160,6 +160,7 @@ pub async fn get_post_thread(
         {
             Ok(response) => Ok(response),
             Err(err) => {
+                tracing::error!("{}", err.to_string());
                 return match err.downcast_ref() {
                     Some(InvalidRequestError::XRPCError(xrpc)) => {
                         if let XRPCError::FailedResponse {
@@ -194,7 +195,7 @@ pub async fn get_post_thread(
                         tracing::error!("@LOG: ERROR: {err}");
                         Err(ApiError::RuntimeError)
                     }
-                }
+                };
             }
         },
     }

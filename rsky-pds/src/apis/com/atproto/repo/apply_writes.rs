@@ -16,8 +16,11 @@ use futures::stream::{self, StreamExt};
 use libipld::Cid;
 use rocket::serde::json::Json;
 use rocket::State;
-use rsky_lexicon::com::atproto::repo::{ApplyWritesInput, ApplyWritesInputRefWrite};
-use rsky_repo::types::PreparedWrite;
+use rsky_lexicon::com::atproto::repo::{
+    ApplyWritesInput, ApplyWritesInputRefWrite, ApplyWritesOutput, ApplyWritesOutputCommit,
+    ApplyWritesOutputResult,
+};
+use rsky_repo::types::{CommitAction, PreparedWrite, WriteOpAction};
 use std::str::FromStr;
 
 async fn inner_apply_writes(
@@ -27,7 +30,7 @@ async fn inner_apply_writes(
     s3_config: &State<SdkConfig>,
     db: DbConn,
     account_manager: AccountManager,
-) -> Result<()> {
+) -> Result<ApplyWritesOutput> {
     let tx: ApplyWritesInput = body.into_inner();
     let ApplyWritesInput {
         repo,
@@ -112,20 +115,40 @@ async fn inner_apply_writes(
 
         let mut lock = sequencer.sequencer.write().await;
         lock.sequence_commit(did.clone(), commit.clone()).await?;
+        drop(lock);
         account_manager
             .update_repo_root(
                 did.to_string(),
-                commit.commit_data.cid,
-                commit.commit_data.rev,
+                commit.commit_data.cid.clone(),
+                commit.commit_data.rev.clone(),
             )
             .await?;
-        Ok(())
+
+        let cid = commit.commit_data.cid.to_string();
+        let rev = commit.commit_data.rev;
+        let mut results = vec![];
+        for op in writes {
+            results.push(ApplyWritesOutputResult {
+                r#type: match op.action() {
+                    WriteOpAction::Create => "com.atproto.repo.applyWrites#create".to_string(),
+                    WriteOpAction::Update => "com.atproto.repo.applyWrites#update".to_string(),
+                    WriteOpAction::Delete => "com.atproto.repo.applyWrites#delete".to_string(),
+                },
+                cid: op.cid().unwrap().to_string(),
+                uri: op.uri().to_string(),
+            })
+        }
+        let result = ApplyWritesOutput {
+            commit: ApplyWritesOutputCommit { cid, rev },
+            results,
+        };
+        Ok(result)
     } else {
         bail!("Could not find repo: `{repo}`")
     }
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(auth, sequencer, s3_config, db, account_manager))]
 #[rocket::post("/xrpc/com.atproto.repo.applyWrites", format = "json", data = "<body>")]
 pub async fn apply_writes(
     body: Json<ApplyWritesInput>,
@@ -134,10 +157,10 @@ pub async fn apply_writes(
     s3_config: &State<SdkConfig>,
     db: DbConn,
     account_manager: AccountManager,
-) -> Result<(), ApiError> {
+) -> Result<Json<ApplyWritesOutput>, ApiError> {
     tracing::debug!("@LOG: debug apply_writes {body:#?}");
     match inner_apply_writes(body, auth, sequencer, s3_config, db, account_manager).await {
-        Ok(()) => Ok(()),
+        Ok(result) => Ok(Json(result)),
         Err(error) => {
             tracing::error!("@LOG: ERROR: {error}");
             Err(ApiError::RuntimeError)

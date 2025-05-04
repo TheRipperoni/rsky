@@ -1,8 +1,9 @@
 use crate::config::ServerConfig;
 use crate::crawlers::Crawlers;
+use crate::db::DbConn;
 use crate::sequencer::events::{
-    AccountEvt, CommitEvt, IdentityEvt, SeqEvt, SyncEvt, TypedAccountEvt, TypedCommitEvt,
-    TypedIdentityEvt, TypedSyncEvt,
+    AccountEvt, CommitEvt, HandleEvt, IdentityEvt, SeqEvt, SyncEvt, TypedAccountEvt,
+    TypedCommitEvt, TypedHandleEvt, TypedIdentityEvt, TypedSyncEvt,
 };
 use crate::sequencer::outbox::{Outbox, OutboxOpts};
 use crate::sequencer::Sequencer;
@@ -17,9 +18,10 @@ use rsky_common::time::from_str_to_utc;
 use rsky_common::RFC3339_VARIANT;
 use rsky_lexicon::com::atproto::sync::{
     SubscribeReposAccount, SubscribeReposCommit, SubscribeReposCommitOperation,
-    SubscribeReposIdentity, SubscribeReposSync,
+    SubscribeReposHandle, SubscribeReposIdentity, SubscribeReposSync,
 };
 use serde_json::json;
+use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::time::{interval, Duration as TokioDuration};
 use ws::Message;
@@ -36,17 +38,17 @@ fn get_backfill_limit(ms: u64) -> String {
 /// specifications for details around stream sequencing, repo versioning, CAR diff format, and more.
 /// Public and does not require auth; implemented by PDS and Relay.
 #[rocket::get("/xrpc/com.atproto.sync.subscribeRepos?<cursor>")]
-#[allow(unused_variables)]
 pub async fn subscribe_repos<'a>(
     cursor: Option<i64>,
     cfg: &'a State<ServerConfig>,
     mut shutdown: Shutdown,
     ws: ws::WebSocket,
 ) -> ws::Stream!['a] {
+    let db_conn = cfg.db_conn.clone();
     ws::Stream! { ws =>
         let sequencer_lock = Sequencer::new(
             Crawlers::new(cfg.service.hostname.clone(), cfg.crawlers.clone()),
-            None,
+            None, db_conn
         );
         let mut outbox = Outbox::new(
             sequencer_lock.clone(),
@@ -62,7 +64,8 @@ pub async fn subscribe_repos<'a>(
         if let Some(cursor) = cursor {
             let next = match sequencer_lock.next_seq(cursor).await {
                 Ok(next) => next,
-                Err(_) => {
+                Err(error) => {
+                    tracing::error!("Failed to fetch next event.");
                     yield Message::Text(json!({
                         "$type": "#error",
                         "name": "NextError",
@@ -73,7 +76,8 @@ pub async fn subscribe_repos<'a>(
             };
             let curr = match sequencer_lock.curr().await {
                 Ok(curr) => curr,
-                Err(_) => {
+                Err(error) => {
+                    tracing::error!("Failed to fetch current event.");
                     yield Message::Text(json!({
                         "$type": "#error",
                         "name": "CurrError",
@@ -88,7 +92,15 @@ pub async fn subscribe_repos<'a>(
                         error: "FutureCursor".to_string(),
                         message: Some("Cursor in the future.".to_string()),
                     });
-                    yield Message::Binary(error_frame.to_bytes().expect("couldn't translate error to binary."));
+                    match error_frame.to_bytes() {
+                        Ok(frame_bytes) => {
+                            yield Message::Binary(frame_bytes);
+                        }
+                        Err(error) => {
+                            tracing::error!("couldn't translate error to binary.");
+                            panic!("couldn't translate error to binary.");
+                        }
+                    }
                 },
                 false => match next {
                     Some(next) if next.sequenced_at < backfill_time => {
@@ -101,6 +113,7 @@ pub async fn subscribe_repos<'a>(
                             Ok(Some(start_evt)) if start_evt.seq.is_some() => outbox_cursor = Some(start_evt.seq.unwrap() - 1),
                             Ok(None) => outbox_cursor = None,
                             _ => {
+                                tracing::error!("Failed to fetch earliest event after backfill time.");
                                 let error_frame = ErrorFrame::new(ErrorFrameBody {
                                     error: "EarliestAfterTimeError".to_string(),
                                     message: Some("Failed to fetch earliest event after backfill time.".to_string()),
@@ -128,6 +141,8 @@ pub async fn subscribe_repos<'a>(
                     let evt = match evt {
                         Some(Ok(evt)) => evt,
                         Some(Err(err)) => {
+                            let err_str = err.to_string();
+                                    tracing::error!("Failed to serialize event to message frame. {err_str}");
                             let error_frame = ErrorFrame::new(ErrorFrameBody {
                                 error: "EventStreamError".to_string(),
                                 message: Some(err.to_string()),
@@ -136,6 +151,7 @@ pub async fn subscribe_repos<'a>(
                             return;
                         },
                         None => {
+                            tracing::error!("Failed to fetch event from stream.");
                             let error_frame = ErrorFrame::new(ErrorFrameBody {
                                 error: "EventStreamError".to_string(),
                                 message: Some("Failed to fetch event from stream.".to_string()),
@@ -173,7 +189,9 @@ pub async fn subscribe_repos<'a>(
                             let message_frame = MessageFrame::new(subscribe_commit_evt, Some(MessageFrameOpts { r#type: Some(format!("#{0}",r#type)) }));
                             let binary = match message_frame.to_bytes() {
                                 Ok(binary) => binary,
-                                Err(_) => {
+                                Err(error) => {
+                                    let err_str = error.to_string();
+                                    tracing::error!("Failed to serialize event to message frame. {err_str}");
                                     let error_frame = ErrorFrame::new(ErrorFrameBody {
                                         error: "SerializationError".to_string(),
                                         message: Some("Failed to serialize event to message frame.".to_string()),
@@ -196,7 +214,9 @@ pub async fn subscribe_repos<'a>(
                             let message_frame = MessageFrame::new(subscribe_identity_evt, Some(MessageFrameOpts { r#type: Some(format!("#{0}",r#type)) }));
                             let binary = match message_frame.to_bytes() {
                                 Ok(binary) => binary,
-                                Err(_) => {
+                                Err(error) => {
+                                    let err_str = error.to_string();
+                                    tracing::error!("Failed to serialize event to message frame. {err_str}");
                                     let error_frame = ErrorFrame::new(ErrorFrameBody {
                                         error: "SerializationError".to_string(),
                                         message: Some("Failed to serialize event to message frame.".to_string()),
@@ -220,7 +240,9 @@ pub async fn subscribe_repos<'a>(
                             let message_frame = MessageFrame::new(subscribe_account_evt, Some(MessageFrameOpts { r#type: Some(format!("#{0}",r#type)) }));
                             let binary = match message_frame.to_bytes() {
                                 Ok(binary) => binary,
-                                Err(_) => {
+                                Err(error) => {
+                                    let err_str = error.to_string();
+                                    tracing::error!("Failed to serialize event to message frame. {err_str}");
                                     let error_frame = ErrorFrame::new(ErrorFrameBody {
                                         error: "SerializationError".to_string(),
                                         message: Some("Failed to serialize event to message frame.".to_string()),
@@ -244,7 +266,9 @@ pub async fn subscribe_repos<'a>(
                             let message_frame = MessageFrame::new(subscribe_sync_evt, Some(MessageFrameOpts { r#type: Some(format!("#{0}",r#type)) }));
                             let binary = match message_frame.to_bytes() {
                                 Ok(binary) => binary,
-                                Err(_) => {
+                                Err(error) => {
+                                    let err_str = error.to_string();
+                                    tracing::error!("Failed to serialize event to message frame. {err_str}");
                                     let error_frame = ErrorFrame::new(ErrorFrameBody {
                                         error: "SerializationError".to_string(),
                                         message: Some("Failed to serialize event to message frame.".to_string()),
@@ -255,13 +279,37 @@ pub async fn subscribe_repos<'a>(
                             };
                             yield Message::Binary(binary);
                         }
-                    }
+                    SeqEvt::TypedHandleEvt(handle) => {
+                            let TypedHandleEvt { r#type, seq, time, evt } = handle;
+                            let HandleEvt { did, handle } = evt;
+                            let handle_evt = SubscribeReposHandle {
+                                did,
+                                seq,
+                                handle,
+                                time: from_str_to_utc(&time),
+                            };
+                            let message_frame = MessageFrame::new(handle_evt, Some(MessageFrameOpts { r#type: Some(format!("#{0}",r#type)) }));
+                            let binary = match message_frame.to_bytes() {
+                                Ok(binary) => binary,
+                                Err(error) => {
+                                    let err_str = error.to_string();
+                                    tracing::error!("Failed to serialize event to message frame. {err_str}");
+                                    let error_frame = ErrorFrame::new(ErrorFrameBody {
+                                        error: "SerializationError".to_string(),
+                                        message: Some("Failed to serialize event to message frame.".to_string()),
+                                    });
+                                    yield Message::Binary(error_frame.to_bytes().expect("couldn't translate error to binary."));
+                                    return;
+                                }
+                            };
+                            yield Message::Binary(binary);
+                        }}
                 }
                message = ws.next() => {
                     match message {
                         Some(Ok(message)) => {
                             match message {
-                                ws::Message::Close(close_frame) => {
+                                Message::Close(close_frame) => {
                                     // Handle Close message
                                     tracing::info!("Received Close message: {:?}", close_frame);
                                     let close_frame = ws::frame::CloseFrame {
@@ -270,13 +318,13 @@ pub async fn subscribe_repos<'a>(
                                     };
                                     break;
                                 },
-                                ws::Message::Ping(payload) => {
+                                Message::Ping(payload) => {
                                     // Respond to Ping with Pong
                                     tracing::info!("Received Ping message");
                                     let pong_message = ws::Message::Pong(payload);
                                     yield pong_message;
                                 },
-                                ws::Message::Pong(_) => {
+                                Message::Pong(_) => {
                                     // Received Pong, can log or ignore
                                     tracing::info!("Received Pong message");
                                 },
@@ -286,11 +334,9 @@ pub async fn subscribe_repos<'a>(
                             }
                         },
                         Some(Err(err)) => {
-                            tracing::info!("WebSocket error: {:?}", err);
                             break;
                         },
                         None => {
-                            tracing::info!("WebSocket closed.");
                             break;
                         }
                     }
@@ -298,7 +344,7 @@ pub async fn subscribe_repos<'a>(
                 // Add the ping interval tick arm
                 _ = ping_interval.tick() => {
                     // Send a Ping message to the client
-                    yield ws::Message::Ping(vec![]);
+                    yield Message::Ping(vec![]);
                 },
                 _ = &mut shutdown => break
             }

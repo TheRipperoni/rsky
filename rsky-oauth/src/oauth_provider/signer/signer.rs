@@ -34,11 +34,13 @@ impl Signer {
         Signer { issuer, keyset }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn verify(
         &self,
         signed_jwt: SignedJwt,
         verify_options: Option<VerifyOptions>,
     ) -> Result<VerifyResult, JwkError> {
+        tracing::info!("Verifying signer");
         let keyset = self.keyset.read().await;
         let verify_options = match verify_options {
             None => None,
@@ -52,6 +54,7 @@ impl Signer {
         result
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn sign(
         &self,
         algorithms: Option<Vec<Algorithm>>,
@@ -59,6 +62,7 @@ impl Signer {
         sign_header: JwtHeader,
         payload: JwtPayload,
     ) -> Result<SignedJwt, JwkError> {
+        tracing::info!("Signing Jwt");
         let keyset = self.keyset.read().await;
         keyset
             .create_jwt(algorithms, search_kids, sign_header, payload)
@@ -96,11 +100,13 @@ impl Signer {
         self.sign(alg, None, header, payload).await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn verify_access_token(
         &self,
         token: SignedJwt,
         options: Option<VerifyOptions>,
     ) -> Result<VerifyAccessTokenResponse, OAuthError> {
+        tracing::info!("Verifying access token");
         let options = match options {
             None => VerifyOptions::default(),
             Some(options) => {
@@ -117,10 +123,10 @@ impl Signer {
 
         if let Some(typ) = &protected_header.typ {
             if typ != "at+jwt" {
-                return Err(OAuthError::InvalidRequestError("".to_string()));
+                return Err(OAuthError::InvalidRequestError("Invalid typ".to_string()));
             }
         } else {
-            return Err(OAuthError::InvalidRequestError("".to_string()));
+            return Err(OAuthError::InvalidRequestError("Missing typ".to_string()));
         }
 
         let payload = match SignedTokenPayload::new(result.payload) {

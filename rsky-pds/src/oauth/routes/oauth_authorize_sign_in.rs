@@ -73,7 +73,7 @@ impl<'r> FromData<'r> for SignIn {
 
         let input = data.open(100000.bytes());
         let datastream = input.into_string().await.unwrap().value;
-        println!("{}", datastream);
+        tracing::info!("{}", datastream);
         let sign_in_payload: SignInPayload = serde_json::from_str(datastream.as_str()).unwrap();
 
         let url_reference = UrlReference {

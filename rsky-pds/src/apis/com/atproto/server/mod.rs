@@ -135,6 +135,7 @@ pub async fn assert_valid_doc_contents(contents: AssertionContents) -> Result<()
             bail!("Server rotation key not included in PLC DID data")
         }
     }
+
     // @TODO: Move next 3 lines to a shared config context
     let port = env_int("PDS_PORT").unwrap_or(2583);
     let hostname = env_str("PDS_HOSTNAME").unwrap_or("localhost".to_owned());

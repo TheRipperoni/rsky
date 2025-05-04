@@ -15,7 +15,7 @@ use lexicon_cid::Cid;
 use rocket::data::{Data, ToByteUnit};
 use rocket::form::validate::Contains;
 use rsky_common::ipld::sha256_raw_to_cid;
-use rsky_common::now;
+use rsky_common::{env, now};
 use rsky_lexicon::blob_refs::BlobRef;
 use rsky_lexicon::com::atproto::admin::StatusAttr;
 use rsky_lexicon::com::atproto::repo::ListMissingBlobsRefRecordBlob;
@@ -137,12 +137,13 @@ impl BlobReader {
         Ok(res)
     }
 
+    #[tracing::instrument(skip(self, blob))]
     pub async fn upload_blob_and_get_metadata(
         &self,
         user_suggested_mime: String,
         blob: Data<'_>,
     ) -> Result<BlobMetadata> {
-        let blob_stream = blob.open(100.mebibytes());
+        let blob_stream = blob.open(env::env_int("PDS_BLOB_UPLOAD_LIMIT").unwrap().mebibytes());
         let bytes = blob_stream.into_bytes().await?;
         let size = bytes.n.written;
         let bytes = bytes.into_inner();

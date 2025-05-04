@@ -11,7 +11,6 @@
       <sourceFolder url="file://$MODULE_DIR$/rsky-firehose/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-lexicon/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-pds/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/serde_ipld_dagcbor/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-mst/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-identity/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-crypto/src" isTestSource="false" />
@@ -26,8 +25,15 @@
       <sourceFolder url="file://$MODULE_DIR$/rsky-pds/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-satnav/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rsky-oauth-frontend/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cbor4ii/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/cbor4ii/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cbor4ii/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

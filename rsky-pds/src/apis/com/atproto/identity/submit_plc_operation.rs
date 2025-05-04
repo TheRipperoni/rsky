@@ -205,7 +205,7 @@ fn validate_operation_body(request: SubmitPlcOperationRequest) -> Result<Operati
     format = "json",
     data = "<body>"
 )]
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(auth, sequencer, id_resolver, server_config, account_manager))]
 pub async fn submit_plc_operation(
     body: Json<SubmitPlcOperationRequest>,
     auth: AccessStandard,
@@ -234,12 +234,14 @@ pub async fn submit_plc_operation(
     //Update Sequencer
     let mut seq_lock = sequencer.sequencer.write().await;
     seq_lock.sequence_identity_evt(did.clone(), None).await?;
+    drop(seq_lock);
 
     //Refresh DID after PLC update
     let mut id_lock = id_resolver.id_resolver.write().await;
     if let Err(error) = id_lock.did.ensure_resolve(&did, None).await {
         tracing::error!("Failed to fresh did after plc update\n{error}")
     };
+    drop(id_lock);
 
     Ok(())
 }

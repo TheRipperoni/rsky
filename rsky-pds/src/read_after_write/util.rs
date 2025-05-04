@@ -140,6 +140,7 @@ pub async fn handle_read_after_write<T: DeserializeOwned + serde::Serialize>(
     }
 }
 
+#[tracing::instrument(skip(res, munge, s3_config, state_local_viewer, db, account_manager))]
 pub async fn read_after_write_internal<T: DeserializeOwned + serde::Serialize>(
     nsid: String,
     requester: String,
@@ -153,8 +154,12 @@ pub async fn read_after_write_internal<T: DeserializeOwned + serde::Serialize>(
     let headers = &res.headers.clone().unwrap_or_else(BTreeMap::new);
     let rev = get_repo_rev(headers);
     match rev {
-        None => Ok(ReadAfterWriteResponse::HandlerPipeThrough(res)),
+        None => {
+            tracing::info!("Repo Revision not found");
+            Ok(ReadAfterWriteResponse::HandlerPipeThrough(res))
+        }
         Some(rev) => {
+            tracing::info!("Repo Revision Found");
             let actor_store = ActorStore::new(
                 requester.clone(),
                 S3BlobStore::new(requester.clone(), s3_config),
@@ -162,10 +167,12 @@ pub async fn read_after_write_internal<T: DeserializeOwned + serde::Serialize>(
             );
             let local = get_records_since_rev(&actor_store, rev).await?;
             if local.count <= 0 {
+                tracing::info!("No new records since last revision");
                 return Ok(ReadAfterWriteResponse::HandlerPipeThrough(res));
             }
             let local_viewer_lock = state_local_viewer.local_viewer.read().await;
             let local_viewer = local_viewer_lock(actor_store, account_manager);
+            drop(local_viewer_lock);
             let parse_res = parse_res(nsid, res)?;
             let data = munge(local_viewer, parse_res, local.clone(), requester)?;
             Ok(ReadAfterWriteResponse::HandlerResponse(

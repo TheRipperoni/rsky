@@ -20,6 +20,7 @@ async fn inner_delete_account(
     s3_config: &State<SdkConfig>,
     db: DbConn,
     account_manager: AccountManager,
+    seq_db: DbConn,
 ) -> Result<(), ApiError> {
     let DeleteAccountInput {
         did,
@@ -54,7 +55,7 @@ async fn inner_delete_account(
         let account_seq = lock
             .sequence_account_evt(did.clone(), AccountStatus::Deleted)
             .await?;
-        sequencer::delete_all_for_user(&did, Some(vec![account_seq])).await?;
+        sequencer::delete_all_for_user(&did, Some(vec![account_seq]), seq_db).await?;
         Ok(())
     } else {
         tracing::error!("account not found");
@@ -75,8 +76,9 @@ pub async fn delete_account(
     db: DbConn,
     _auth: AdminToken,
     account_manager: AccountManager,
+    seq_db: DbConn,
 ) -> Result<(), ApiError> {
-    match inner_delete_account(body, sequencer, s3_config, db, account_manager).await {
+    match inner_delete_account(body, sequencer, s3_config, db, account_manager, seq_db).await {
         Ok(_) => Ok(()),
         Err(error) => Err(error),
     }

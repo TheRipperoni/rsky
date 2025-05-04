@@ -69,8 +69,9 @@ async fn inner_put_record(
                 .record
                 .get_record(&uri, None, Some(true))
                 .await?;
-            tracing::debug!("@LOG: debug inner_put_record, current: {current:?}");
+            tracing::info!("@LOG: debug inner_put_record, current: {current:?}");
             let write: PreparedWrite = if current.is_some() {
+                tracing::info!("Updating record");
                 PreparedWrite::Update(
                     prepare_update(PrepareUpdateOpts {
                         did: did.clone(),
@@ -83,12 +84,13 @@ async fn inner_put_record(
                     .await?,
                 )
             } else {
+                tracing::info!("New record");
                 PreparedWrite::Create(
                     prepare_create(PrepareCreateOpts {
                         did: did.clone(),
                         collection,
                         rkey: Some(rkey),
-                        swap_cid: swap_record_cid,
+                        swap_cid: None,
                         record: serde_json::from_value(record)?,
                         validate,
                     })
@@ -133,7 +135,7 @@ pub async fn put_record(
     db: DbConn,
     account_manager: AccountManager,
 ) -> Result<Json<PutRecordOutput>, ApiError> {
-    tracing::debug!("@LOG: debug put_record {body:#?}");
+    tracing::info!("@LOG: debug put_record {body:#?}");
     match inner_put_record(body, auth, sequencer, s3_config, db, account_manager).await {
         Ok(res) => Ok(Json(res)),
         Err(error) => {

@@ -134,7 +134,6 @@ impl OAuthVerifier {
         dpop_jkt: Option<String>,
         verify_options: Option<VerifyTokenClaimsOptions>,
     ) -> Result<VerifyTokenClaimsResult, OAuthError> {
-        println!("{}", token.clone().into_inner());
         let signed_jwt = match SignedJwt::new(token.clone().into_inner()) {
             Ok(signed_jwt) => signed_jwt,
             Err(_) => {
@@ -251,10 +250,9 @@ mod tests {
             redis: None,
             replay_store: None,
             dpop_options: Some(DpopManagerOptions {
-                dpop_secret: Some(DpopNonceInput::String(
-                    "1c9d92bea9a498e6165a39473e724a5d1c9d92bea9a498e6165a39473e724a5d".to_string(),
-                )),
-                dpop_step: Some(1),
+                dpop_secret: None,
+                dpop_step: None,
+                expiration_time: Some(1000000),
             }),
         };
         OAuthVerifier::new(opts)
@@ -311,7 +309,6 @@ mod tests {
         assert_eq!(result, expected)
     }
 
-    //TODO Fix nonce for testing
     #[tokio::test]
     async fn test_authenticate_request() {
         let mut oauth_verifier = create_oauth_verifier().await;

@@ -32,16 +32,37 @@ async fn inner_get_record(
             ActorStore::new(did.clone(), S3BlobStore::new(did.clone(), s3_config), db);
 
         match actor_store.record.get_record(&uri, cid, None).await {
-            Ok(Some(record)) if record.takedown_ref.is_none() => Ok(GetRecordOutput {
-                uri: uri.to_string(),
-                cid: Some(record.cid),
-                value: serde_json::to_value(record.value)?,
-            }),
-            _ => bail!("Could not locate record: `{uri}`"),
+            Ok(Some(record)) => {
+                tracing::info!("{}", record);
+                if record.takedown_ref.is_none() {
+                    Ok(GetRecordOutput {
+                        uri: uri.to_string(),
+                        cid: Some(record.cid),
+                        value: serde_json::to_value(record.value)?,
+                    })
+                } else {
+                    tracing::error!("Takedown ref not none");
+                    bail!("Could not locate record: `{uri}`")
+                }
+            }
+            Err(x) => {
+                //todo falling back to appview might make sense
+                let y = x.to_string();
+                tracing::error!("Error retrieving record from actor store: {y}  ");
+                bail!("Could not locate record: `{uri}`")
+            }
+            Ok(None) => {
+                tracing::error!("Could not find record from actor store.");
+                bail!("Could not locate record")
+            }
         }
     } else {
+        tracing::info!("Account not hosted on pds");
         match req.cfg.bsky_app_view {
-            None => bail!("Could not locate record"),
+            None => {
+                tracing::error!("Could not find record from actor store");
+                bail!("Could not locate record from appview")
+            }
             Some(_) => match pipethrough(
                 &req,
                 None,
@@ -53,7 +74,7 @@ async fn inner_get_record(
             .await
             {
                 Err(error) => {
-                    tracing::error!("@LOG: ERROR: {error}");
+                    tracing::error!("{error}");
                     bail!("Could not locate record")
                 }
                 Ok(res) => {
@@ -65,7 +86,7 @@ async fn inner_get_record(
     }
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(s3_config, db, req, account_manager))]
 #[rocket::get("/xrpc/com.atproto.repo.getRecord?<repo>&<collection>&<rkey>&<cid>")]
 pub async fn get_record(
     repo: String,

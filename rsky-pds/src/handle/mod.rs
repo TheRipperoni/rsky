@@ -11,12 +11,14 @@ pub struct HandleValidationContext<'a> {
     pub id_resolver: &'a State<SharedIdResolver>,
 }
 
+#[derive(Debug)]
 pub struct HandleValidationOpts {
     pub handle: String,
     pub did: Option<String>,
     pub allow_reserved: Option<bool>,
 }
 
+#[tracing::instrument(skip(ctx))]
 pub async fn normalize_and_validate_handle(
     opts: HandleValidationOpts,
     ctx: HandleValidationContext<'_>,
@@ -26,6 +28,7 @@ pub async fn normalize_and_validate_handle(
 
     // TLD validation
     if !is_valid_tld(&handle) {
+        tracing::error!("Invalid Handle TLD");
         return Err(Error::new(
             ErrorKind::InvalidHandle,
             "Handle TLD is invalid or disallowed",
@@ -34,6 +37,7 @@ pub async fn normalize_and_validate_handle(
 
     // Slur check
     if has_explicit_slur(&handle) {
+        tracing::error!("Slur in handle");
         return Err(Error::new(
             ErrorKind::InvalidHandle,
             "Inappropriate language in handle",

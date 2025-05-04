@@ -1,6 +1,6 @@
 use crate::jwk::{
-    algorithm_as_string, jwk_algorithms, Audience, JwkError, JwtHeader, JwtPayload, Key, SignedJwt,
-    VerifyOptions, VerifyResult,
+    algorithm_as_string, jwk_algorithms, string_as_algorithm, Audience, JwkError, JwtHeader,
+    JwtPayload, Key, SignedJwt, VerifyOptions, VerifyResult,
 };
 use crate::oauth_provider::oidc::sub::Sub;
 use biscuit::jwa::*;
@@ -147,10 +147,11 @@ impl Key for JoseKey {
                 private: payload.clone(),
             };
             let algorithm = header.alg.clone().unwrap();
+            let algorithm = string_as_algorithm(algorithm).unwrap();
             let decoded_jwt = JWT::<JwtPayload, JwtHeader>::new_decoded(
-                jws::Header {
+                Header {
                     registered: RegisteredHeader {
-                        algorithm: SignatureAlgorithm::HS256,
+                        algorithm,
                         media_type: header.typ.clone(),
                         content_type: header.cty.clone(),
                         web_key_url: header.jku.clone(),

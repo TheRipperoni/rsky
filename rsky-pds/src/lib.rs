@@ -75,6 +75,7 @@ use crate::oauth::provider::{build_oauth_provider, AuthProviderOptions};
 use crate::oauth::SharedReplayStore;
 use atrium_api::client::AtpServiceClient;
 use atrium_xrpc_client::reqwest::ReqwestClientBuilder;
+use aws_sdk_s3::config::Region;
 use diesel::sql_types::Int4;
 use dotenvy::dotenv;
 use rand::{random, Rng};
@@ -214,7 +215,7 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
     };
 
     let db: Map<_, Value> = map! {
-        "url" => db_url.into(),
+        "url" => db_url.clone().into(),
         "pool_size" => 20.into(),
         "timeout" => 30.into(),
     };
@@ -222,12 +223,14 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
     let figment = rocket::Config::figment()
         .merge(("databases", map!["pg_db" => db]))
         .merge(("limits", Limits::default().limit("file", 100.mebibytes())));
-    let cfg = env_to_cfg();
+    let mut cfg = env_to_cfg();
+    cfg.db_conn = db_url.clone();
 
     let sequencer = SharedSequencer {
         sequencer: RwLock::new(Sequencer::new(
             Crawlers::new(cfg.service.hostname.clone(), cfg.crawlers.clone()),
             None,
+            db_url.clone(),
         )),
     };
     let mut background_sequencer = sequencer.sequencer.write().await.clone();
@@ -235,6 +238,7 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
 
     let aws_sdk_config = aws_config::from_env()
         .endpoint_url(env::var("AWS_ENDPOINT").unwrap_or("localhost".to_owned()))
+        .region(Region::new("us-east-1"))
         .load()
         .await;
 

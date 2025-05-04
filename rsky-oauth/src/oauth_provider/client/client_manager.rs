@@ -133,7 +133,7 @@ impl ClientManager {
                 .get_discoverable_client_metadata(&discoverable_client_id)
                 .await;
         } else {
-            println!("stored client");
+            tracing::info!("stored client");
             return self.get_stored_client_metadata(client_id).await;
         }
     }

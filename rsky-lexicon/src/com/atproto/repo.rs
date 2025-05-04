@@ -173,6 +173,25 @@ pub struct CreateRecordOutput {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ApplyWritesOutputCommit {
+    pub cid: String,
+    pub rev: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ApplyWritesOutputResult {
+    pub r#type: String,
+    pub cid: String,
+    pub uri: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ApplyWritesOutput {
+    pub commit: ApplyWritesOutputCommit,
+    pub results: Vec<ApplyWritesOutputResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct PutRecordOutput {
     pub cid: String,
     pub uri: String,
