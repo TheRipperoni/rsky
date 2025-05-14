@@ -7,7 +7,6 @@ use base64ct::{Base64, Encoding};
 use biscuit::jwk::{JWKSet, JWK};
 use biscuit::{Empty, JWT};
 use sha2::{Digest, Sha256};
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

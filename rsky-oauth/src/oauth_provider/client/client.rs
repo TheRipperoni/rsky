@@ -1,15 +1,20 @@
-use crate::jwk::{JwtHeader, JwtPayload, VerifyOptions, VerifyResult};
-use crate::oauth_provider::client::client_auth::{ClientAuth, ClientAuthDetails};
+use crate::jwk::{
+    DecodeRequestObjectResult, JwtHeader, JwtPayload, UnsecuredResult, VerifyOptions, VerifyResult,
+};
+use crate::oauth_provider::client::client_auth::{
+    auth_jwk_thumbprint, ClientAuth, ClientAuthDetails,
+};
 use crate::oauth_provider::client::client_info::ClientInfo;
 use crate::oauth_provider::constants::JAR_MAX_AGE;
 use crate::oauth_provider::errors::OAuthError;
 use crate::oauth_provider::lib::util::redirect_uri::compare_redirect_uri;
+use crate::oauth_provider::oauth_provider::DecodeJarResponse::DecodeJarSecureResponse;
 use crate::oauth_types::{
     OAuthAuthorizationRequestParameters, OAuthClientCredentials, OAuthClientId,
     OAuthClientMetadata, OAuthEndpointAuthMethod, OAuthGrantType, OAuthIssuerIdentifier,
     OAuthRedirectUri, CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
-use biscuit::jwk::JWKSet;
+use biscuit::jwk::{JWKSet, JWK};
 use biscuit::{Empty, JWT};
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +46,10 @@ impl Client {
         }
     }
 
-    pub async fn decode_request_object(&self, jar: &str) -> Result<VerifyResult, OAuthError> {
+    pub async fn decode_request_object(
+        &self,
+        jar: &str,
+    ) -> Result<DecodeRequestObjectResult, OAuthError> {
         match &self.metadata.request_object_signing_alg {
             None => {
                 // https://openid.net/specs/openid-connect-registration-1_0.html#rfc.section.2
@@ -51,7 +59,10 @@ impl Client {
                     max_token_age: Some(JAR_MAX_AGE / 1000),
                     ..Default::default()
                 };
-                self.jwt_verify(jar.to_string(), Some(verify_options)).await
+                Ok(DecodeRequestObjectResult::SecuredResult(
+                    self.jwt_verify(jar.to_string(), Some(verify_options))
+                        .await?,
+                ))
             }
             Some(request_object_signing_alg) => {
                 if request_object_signing_alg == "none" {
@@ -59,14 +70,19 @@ impl Client {
                         max_token_age: Some(JAR_MAX_AGE / 1000),
                         ..Default::default()
                     };
-                    self.jwt_verify_unsecured(jar.to_string(), Some(verify_options))
-                        .await
+                    Ok(DecodeRequestObjectResult::UnsecuredResult(
+                        self.jwt_verify_unsecured(jar.to_string(), Some(verify_options))
+                            .await?,
+                    ))
                 } else {
                     let verify_options = VerifyOptions {
                         max_token_age: Some(JAR_MAX_AGE / 1000),
                         ..Default::default()
                     };
-                    self.jwt_verify(jar.to_string(), Some(verify_options)).await
+                    Ok(DecodeRequestObjectResult::SecuredResult(
+                        self.jwt_verify(jar.to_string(), Some(verify_options))
+                            .await?,
+                    ))
                 }
             }
         }
@@ -76,13 +92,13 @@ impl Client {
         &self,
         token: String,
         options: Option<VerifyOptions>,
-    ) -> Result<VerifyResult, OAuthError> {
+    ) -> Result<UnsecuredResult, OAuthError> {
         let jwks = self.jwks.clone().unwrap();
         let mut options = options.unwrap_or(VerifyOptions::default());
         options.issuer = Some(OAuthIssuerIdentifier::new(self.id.clone().as_str()).unwrap());
         let expected_jwt = JWT::<JwtPayload, JwtHeader>::new_encoded(token.as_str());
         let result = expected_jwt.decode_with_jwks_ignore_kid(&jwks).unwrap();
-        let verify_result = VerifyResult {
+        Ok(UnsecuredResult {
             payload: JwtPayload {
                 iss: None,
                 aud: None,
@@ -127,21 +143,8 @@ impl Client {
                 authorization_details: None,
                 additional_claims: Default::default(),
             },
-            protected_header: JwtHeader {
-                alg: None,
-                jku: None,
-                jwk: None,
-                kid: None,
-                x5u: None,
-                x5c: None,
-                x5t: None,
-                x5t_s256: None,
-                typ: None,
-                cty: None,
-                crit: None,
-            },
-        };
-        Ok(verify_result)
+            header: Default::default(),
+        })
     }
 
     async fn jwt_verify(
@@ -212,6 +215,7 @@ impl Client {
                 cty: None,
                 crit: None,
             },
+            key: jwks.keys.get(0).unwrap().clone(),
         };
         Ok(verify_result)
     }
@@ -301,19 +305,10 @@ impl Client {
         if client_auth.method() == CLIENT_ASSERTION_TYPE_JWT_BEARER {
             return match self.metadata.token_endpoint_auth_method.unwrap() {
                 OAuthEndpointAuthMethod::PrivateKeyJwt => {
-                    // let key;
-                    // const key = await this.keyGetter(
-                    //     {
-                    //         kid: clientAuth.kid,
-                    //         alg: clientAuth.alg,
-                    //     },
-                    //     { payload: '', signature: '' },
-                    // )
-                    //todo
-                    // let jtk = auth_jwk_thumbprint(key).await;
+                    let key = self.jwks.clone().unwrap().keys.get(0).unwrap().clone();
+                    let jtk = auth_jwk_thumbprint(&key).await;
 
-                    unimplemented!()
-                    // jtk == client_auth.jkt
+                    return jtk == client_auth.jkt();
                 }
                 _ => false,
             };
@@ -464,9 +459,28 @@ mod tests {
         ApplicationType, Display, OAuthClientCredentialsNone, OAuthCodeChallengeMethod,
         OAuthResponseType, OAuthScope, Prompt, ResponseMode,
     };
+    use biscuit::jwa::{Algorithm, SignatureAlgorithm};
+    use biscuit::jwk::{
+        AlgorithmParameters, CommonParameters, EllipticCurve, EllipticCurveKeyParameters,
+        EllipticCurveKeyType,
+    };
 
     fn create_client() -> Client {
         let id = OAuthClientId::new("http://localhost/client-metadata.json").unwrap();
+        let jwk = JWK {
+            common: CommonParameters {
+                algorithm: Some(Algorithm::Signature(SignatureAlgorithm::ES256)),
+                ..Default::default()
+            },
+            algorithm: AlgorithmParameters::EllipticCurve(EllipticCurveKeyParameters {
+                key_type: EllipticCurveKeyType::EC,
+                curve: EllipticCurve::P256,
+                x: base64_url::decode("A04hGmnNyRzyQ7U8Mf0vImpmPWhUv-PpHXggrEjJ6U0").unwrap(),
+                y: base64_url::decode("GV_74zLzH5jBHu_vuOxeNXW5SBH6B3TEN9zPDT7GuSw").unwrap(),
+                d: None,
+            }),
+            additional: Empty {},
+        };
         let metadata = OAuthClientMetadata {
             redirect_uris: vec![
                 OAuthRedirectUri::new("http://127.0.0.1/").unwrap(),
@@ -504,12 +518,12 @@ mod tests {
             dpop_bound_access_tokens: Some(true),
             authorization_details_types: None,
         };
-        let jwks: JWKSet<Empty> = JWKSet { keys: vec![] };
+        let jwks: JWKSet<Empty> = JWKSet { keys: vec![jwk] };
         let info = ClientInfo {
             is_first_party: false,
             is_trusted: false,
         };
-        Client::new(id, metadata, None, info)
+        Client::new(id, metadata, Some(jwks), info)
     }
 
     #[tokio::test]
@@ -517,9 +531,11 @@ mod tests {
         let client = create_client();
         let jar = "{}";
         let res = client.decode_request_object(jar).await.unwrap();
-        // let text = "rsky.com".to_string();
-        // let result = validate_url(&text);
-        // assert_eq!(result, None);
+        let expected = DecodeRequestObjectResult::UnsecuredResult(UnsecuredResult {
+            payload: Default::default(),
+            header: Default::default(),
+        });
+        assert_eq!(res, expected);
     }
 
     #[tokio::test]

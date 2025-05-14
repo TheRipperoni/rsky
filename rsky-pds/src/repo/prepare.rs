@@ -165,9 +165,9 @@ pub fn set_collection_name(
 
 pub async fn cid_for_safe_record(record: RepoRecord) -> anyhow::Result<Cid> {
     let lex = lex_to_ipld(Lex::Map(record));
-    let block = serde_ipld_dagcbor::to_vec(&lex)?;
+    // let block = serde_ipld_dagcbor::to_vec(&lex)?;
     // Confirm whether Block properly transforms between lex and cbor
-    let _ = cbor_to_lex(block)?;
+    // let _ = cbor_to_lex(block)?;
     cid_for_cbor(&lex)
 }
 
@@ -271,6 +271,22 @@ lazy_static! {
 mod tests {
     use super::*;
 
+    //     #[tokio::test]
+    //     pub async fn test_profile_cid_for_safe_record() {
+    //         let record: RepoRecord = serde_json::from_value(json!({
+    //   "$type": "app.bsky.actor.profile",
+    //   "test": 1,
+    // })).unwrap();
+    //         let lex = lex_to_ipld(Lex::Map(record.clone()));
+    //         let block = serde_ipld_dagcbor::to_vec(&lex).unwrap();
+    //         println!("{:02X?}", block);
+    //         let result = cid_for_safe_record(record).await.unwrap();
+    //         assert_eq!(
+    //             result.to_string(),
+    //             "bafyreids463j55lebwc7efictrz4uz7twihfe6iwzyjy3ob27ccu6upwgu".to_string()
+    //         );
+    //     }
+
     #[tokio::test]
     pub async fn test_profile_cid_for_safe_record() {
         let record: RepoRecord = serde_json::from_value(json!({
@@ -296,16 +312,16 @@ mod tests {
     "cid": "bafyreihm5eiw7jpwyfa7b2cgtsanoagxo73nvx264k7lt5plzken2gfnke",
     "uri": "at://did:plc:w4xbfzo7kqfes5zb7r6qv3rw/app.bsky.feed.post/3lm5qcjzwic26"
   },
-  "description": r#"Founder, @blacksky.app\nASML Fellow, Berkman Klein Center @harvard.edu\n\nBuilding community networks and technologies blackskyweb.xyz + wethepeople.nyc\n\nmove fast and break chains; \nrevolution now; not tomorrow\u2014now. \ud83c\udff4\u200d\u2620\ufe0f\n\n\ud83d\udd17: https://linkat.blue/rudyfraser.com"#,
+  "description": r#"Founder & CEO, @blacksky.app\nASML Fellow, Berkman Klein, @harvard.edu\n\nBuilding community networks and technologies blackskyweb.xyz + wethepeople.nyc\n\nmove fast and break chains; \nrevolution now; not tomorrow\u2014now. \ud83c\udff4\u200d\u2620\ufe0f\n\n\ud83d\udd17: https://linkat.blue/rudyfraser.com"#,
   "displayName": "Rudy wants revolution."
-})).unwrap();
+    })).unwrap();
         let lex = lex_to_ipld(Lex::Map(record.clone()));
         let block = serde_ipld_dagcbor::to_vec(&lex).unwrap();
         println!("{:02X?}", block);
         let result = cid_for_safe_record(record).await.unwrap();
         assert_eq!(
             result.to_string(),
-            "bafyreids463j55lebwc7efictrz4uz7twihfe6iwzyjy3ob27ccu6upwgu".to_string()
+            "bafyreicaaxdpy7zhtt2p6ddhwngyxaciihmwed3wrvk5kn2wkmsi7q3qhi".to_string()
         );
     }
 

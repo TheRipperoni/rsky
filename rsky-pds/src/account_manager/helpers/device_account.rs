@@ -8,7 +8,6 @@ use chrono::{DateTime, Utc};
 use diesel::*;
 use diesel::{delete, QueryDsl, RunQueryDsl};
 use rsky_common;
-use rsky_common::now;
 use rsky_oauth::jwk::Audience;
 use rsky_oauth::oauth_provider::account::account::Account;
 use rsky_oauth::oauth_provider::account::account_store::{AccountInfo, DeviceAccountInfo};
@@ -17,10 +16,10 @@ use rsky_oauth::oauth_provider::oidc::sub::Sub;
 use rsky_oauth::oauth_types::OAuthClientId;
 
 pub async fn add_authorized_client(
-    db: &DbConn,
-    device_id: DeviceId,
-    sub: Sub,
-    client_id: OAuthClientId,
+    _db: &DbConn,
+    _device_id: DeviceId,
+    _sub: Sub,
+    _client_id: OAuthClientId,
 ) -> Result<()> {
     //TODO
     // db.run(move |conn| {

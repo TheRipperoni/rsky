@@ -29,3 +29,5 @@ base64ct = { version = "1.7.3", features = ["alloc"] }
 biscuit = "0.7.0"
 base64-url = "3.0.0"
 num-bigint = "0.4.6"
+hmac = "0.13.0-pre.5"
+rsky-identity = { workspace = true }

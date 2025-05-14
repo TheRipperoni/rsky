@@ -31,6 +31,8 @@
       <sourceFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/serde_ipld_dagcbor/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/serde_ipld_dagcbor/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/serde-ipld-dagcbor/target" />

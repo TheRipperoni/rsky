@@ -1,5 +1,7 @@
 use crate::jwk::{JwtHeader, JwtPayload};
 use crate::oauth_types::OAuthIssuerIdentifier;
+use biscuit::jwk::JWK;
+use biscuit::Empty;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -17,9 +19,29 @@ pub struct VerifyOptions {
 }
 
 #[derive(Serialize, Eq, PartialEq, Deserialize, Debug)]
+pub enum DecodeRequestObjectResult {
+    UnsecuredResult(UnsecuredResult),
+    SecuredResult(VerifyResult),
+}
+
+impl DecodeRequestObjectResult {
+    pub fn payload(&self) -> &JwtPayload {
+        match self {
+            DecodeRequestObjectResult::UnsecuredResult(result) => &result.payload,
+            DecodeRequestObjectResult::SecuredResult(result) => &result.payload,
+        }
+    }
+
+    pub fn new() -> Self {
+        unimplemented!()
+    }
+}
+
+#[derive(Serialize, Eq, PartialEq, Deserialize, Debug)]
 pub struct VerifyResult {
     pub payload: JwtPayload,
     pub protected_header: JwtHeader,
+    pub key: JWK<Empty>,
 }
 
 #[derive(Serialize, Eq, PartialEq, Deserialize, Debug)]

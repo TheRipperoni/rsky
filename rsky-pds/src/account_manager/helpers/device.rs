@@ -1,10 +1,7 @@
 use crate::db::DbConn;
 use crate::models::models;
 use anyhow::Result;
-use diesel::{
-    delete, insert_into, update, ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper,
-};
-use rsky_common;
+use diesel::{delete, insert_into, ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
 use rsky_oauth::oauth_provider::device::device_data::DeviceData;
 use rsky_oauth::oauth_provider::device::device_id::DeviceId;
 use rsky_oauth::oauth_provider::device::device_store::PartialDeviceData;
@@ -53,11 +50,10 @@ pub async fn read_device(device_id: DeviceId, db: &DbConn) -> Result<Option<Devi
 }
 
 pub async fn update_device(
-    device_id: DeviceId,
+    _device_id: DeviceId,
     opts: PartialDeviceData,
     db: &DbConn,
 ) -> Result<()> {
-    use crate::schema::pds::device::dsl as DeviceSchema;
     db.run(move |conn| {
         //TODO
         // let mut update_list= vec![];

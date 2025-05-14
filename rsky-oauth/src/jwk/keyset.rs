@@ -286,10 +286,11 @@ mod tests {
             },
             protected_header: JwtHeader {
                 alg: Some("ES256".to_string()),
-                jwk: Some(jwk),
+                jwk: Some(jwk.clone()),
                 typ: Some("dpop+jwt".to_string()),
                 ..Default::default()
             },
+            key: jwk,
         };
         assert_eq!(result, expected)
     }

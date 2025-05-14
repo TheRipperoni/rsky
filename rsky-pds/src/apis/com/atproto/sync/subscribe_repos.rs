@@ -1,6 +1,5 @@
 use crate::config::ServerConfig;
 use crate::crawlers::Crawlers;
-use crate::db::DbConn;
 use crate::sequencer::events::{
     AccountEvt, CommitEvt, HandleEvt, IdentityEvt, SeqEvt, SyncEvt, TypedAccountEvt,
     TypedCommitEvt, TypedHandleEvt, TypedIdentityEvt, TypedSyncEvt,
@@ -21,7 +20,6 @@ use rsky_lexicon::com::atproto::sync::{
     SubscribeReposHandle, SubscribeReposIdentity, SubscribeReposSync,
 };
 use serde_json::json;
-use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::time::{interval, Duration as TokioDuration};
 use ws::Message;
@@ -64,7 +62,7 @@ pub async fn subscribe_repos<'a>(
         if let Some(cursor) = cursor {
             let next = match sequencer_lock.next_seq(cursor).await {
                 Ok(next) => next,
-                Err(error) => {
+                Err(_error) => {
                     tracing::error!("Failed to fetch next event.");
                     yield Message::Text(json!({
                         "$type": "#error",
@@ -76,7 +74,7 @@ pub async fn subscribe_repos<'a>(
             };
             let curr = match sequencer_lock.curr().await {
                 Ok(curr) => curr,
-                Err(error) => {
+                Err(_error) => {
                     tracing::error!("Failed to fetch current event.");
                     yield Message::Text(json!({
                         "$type": "#error",
@@ -96,7 +94,7 @@ pub async fn subscribe_repos<'a>(
                         Ok(frame_bytes) => {
                             yield Message::Binary(frame_bytes);
                         }
-                        Err(error) => {
+                        Err(_error) => {
                             tracing::error!("couldn't translate error to binary.");
                             panic!("couldn't translate error to binary.");
                         }
@@ -312,7 +310,7 @@ pub async fn subscribe_repos<'a>(
                                 Message::Close(close_frame) => {
                                     // Handle Close message
                                     tracing::info!("Received Close message: {:?}", close_frame);
-                                    let close_frame = ws::frame::CloseFrame {
+                                    ws::frame::CloseFrame {
                                         code: ws::frame::CloseCode::Normal,
                                         reason: "Client disconnected".to_string().into(),
                                     };
@@ -333,7 +331,7 @@ pub async fn subscribe_repos<'a>(
                                 }
                             }
                         },
-                        Some(Err(err)) => {
+                        Some(Err(_err)) => {
                             break;
                         },
                         None => {

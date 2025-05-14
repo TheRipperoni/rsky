@@ -3,7 +3,6 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
 use rocket_sync_db_pools::database;
-use std::env;
 use std::fmt::{Debug, Formatter};
 
 #[database("pg_db")]

@@ -1,4 +1,4 @@
-use crate::jwk::Keyset;
+use crate::jwk::{DecodeRequestObjectResult, Keyset};
 use crate::oauth_provider::access_token::access_token_type::AccessTokenType;
 use crate::oauth_provider::account::account::Account;
 use crate::oauth_provider::account::account_manager::AccountManager;
@@ -6,7 +6,9 @@ use crate::oauth_provider::account::account_store::{
     AccountStore, DeviceAccountInfo, SignInCredentials,
 };
 use crate::oauth_provider::client::client::Client;
-use crate::oauth_provider::client::client_auth::{ClientAuth, ClientAuthDetails};
+use crate::oauth_provider::client::client_auth::{
+    auth_jwk_thumbprint, ClientAuth, ClientAuthDetails,
+};
 use crate::oauth_provider::client::client_manager::{ClientManager, LoopbackMetadataGetter};
 use crate::oauth_provider::client::client_store::ClientStore;
 use crate::oauth_provider::constants::{AUTHENTICATION_MAX_AGE, TOKEN_MAX_AGE};
@@ -135,11 +137,29 @@ impl<'r> Responder<'r, 'static> for SignInResponse {
     }
 }
 
-pub struct DecodeJarResponse {
+pub enum DecodeJarResponse {
+    DecodeJarSecureResponse(DecodeJarSecureResponse),
+    DecodeJarUnsecureResponse(DecodeJarUnsecureResponse),
+}
+
+impl DecodeJarResponse {
+    pub fn payload(&self) -> &OAuthAuthorizationRequestParameters {
+        match self {
+            DecodeJarResponse::DecodeJarSecureResponse(result) => &result.payload,
+            DecodeJarResponse::DecodeJarUnsecureResponse(result) => &result.payload,
+        }
+    }
+}
+
+pub struct DecodeJarSecureResponse {
     pub payload: OAuthAuthorizationRequestParameters,
-    pub kid: Option<String>,
-    pub alg: Option<String>,
-    pub jkt: Option<String>,
+    pub kid: String,
+    pub alg: String,
+    pub jkt: String,
+}
+
+pub struct DecodeJarUnsecureResponse {
+    pub payload: OAuthAuthorizationRequestParameters,
 }
 
 pub struct OAuthProviderOptions {
@@ -557,9 +577,9 @@ impl OAuthProvider {
         input: OAuthAuthorizationRequestJar,
     ) -> Result<DecodeJarResponse, OAuthError> {
         let result = client.decode_request_object(input.jwt()).await?;
-        let claims = result.payload.clone();
+        let claims = result.payload();
         let payload = OAuthAuthorizationRequestParameters {
-            client_id: result.payload.client_id.clone().unwrap(),
+            client_id: claims.client_id.clone().unwrap(),
             state: None,
             redirect_uri: None,
             scope: None,
@@ -600,28 +620,32 @@ impl OAuthProvider {
             ));
         }
 
-        let kid = result.protected_header.kid;
-        let alg = result.protected_header.alg;
-        unimplemented!()
-        // let jkt = result.cl
-        // if let Some(protected_header) = result.1 {
-        //     let kid = protected_header.0;
-        //     let alg = protected_header.1;
-        //     let jkt = protected_header.2;
-        //     Ok(DecodeJarResponse {
-        //         payload,
-        //         kid: Some(kid),
-        //         alg: Some(alg),
-        //         jkt: Some(jkt),
-        //     })
-        // } else {
-        //     Ok(DecodeJarResponse {
-        //         payload,
-        //         kid: None,
-        //         alg: None,
-        //         jkt: None,
-        //     })
-        // }
+        match result {
+            DecodeRequestObjectResult::UnsecuredResult(_) => Ok(
+                DecodeJarResponse::DecodeJarUnsecureResponse(DecodeJarUnsecureResponse { payload }),
+            ),
+            DecodeRequestObjectResult::SecuredResult(result) => {
+                let kid = match result.protected_header.kid {
+                    None => {
+                        return Err(OAuthError::InvalidParametersError(
+                            payload,
+                            "Missing \"kid\" in header".to_string(),
+                        ));
+                    }
+                    Some(kid) => kid,
+                };
+                let alg = result.protected_header.alg.unwrap();
+                let jkt = auth_jwk_thumbprint(&result.key).await;
+                Ok(DecodeJarResponse::DecodeJarSecureResponse(
+                    DecodeJarSecureResponse {
+                        payload,
+                        kid,
+                        alg,
+                        jkt,
+                    },
+                ))
+            }
+        }
     }
 
     /**
@@ -638,7 +662,7 @@ impl OAuthProvider {
             OAuthAuthorizationRequestPar::Parameters(request) => request,
             OAuthAuthorizationRequestPar::Jar(request) => {
                 match self.decode_jar(&client, request).await {
-                    Ok(res) => res.payload,
+                    Ok(res) => res.payload().clone(),
                     Err(e) => return Err(OAuthError::InvalidRequestError("test".to_string())),
                 }
             }
@@ -669,35 +693,38 @@ impl OAuthProvider {
             }
             OAuthAuthorizationRequestQuery::Jar(request_query) => {
                 let request_object = self.decode_jar(&client, request_query).await?;
-                if request_object.kid.is_some() {
-                    // Allow using signed JAR during "/authorize" as client authentication.
-                    // This allows clients to skip PAR to initiate trusted sessions.
-                    let client_auth = ClientAuth::new(Some(ClientAuthDetails {
-                        alg: request_object.alg.unwrap(),
-                        kid: request_object.kid.unwrap(),
-                        jkt: request_object.jkt.unwrap(),
-                    }));
+                match request_object {
+                    DecodeJarResponse::DecodeJarSecureResponse(response) => {
+                        // Allow using signed JAR during "/authorize" as client authentication.
+                        // This allows clients to skip PAR to initiate trusted sessions.
+                        let client_auth = ClientAuth::new(Some(ClientAuthDetails {
+                            alg: response.alg,
+                            kid: response.kid,
+                            jkt: response.jkt,
+                        }));
 
-                    self.request_manager
-                        .create_authorization_request(
-                            client,
-                            client_auth,
-                            request_object.payload,
-                            Some(device_id),
-                            None,
-                        )
-                        .await
-                } else {
-                    let client_auth = ClientAuth::new(None);
-                    self.request_manager
-                        .create_authorization_request(
-                            client,
-                            client_auth,
-                            request_object.payload,
-                            Some(device_id),
-                            None,
-                        )
-                        .await
+                        self.request_manager
+                            .create_authorization_request(
+                                client,
+                                client_auth,
+                                response.payload,
+                                Some(device_id),
+                                None,
+                            )
+                            .await
+                    }
+                    DecodeJarResponse::DecodeJarUnsecureResponse(response) => {
+                        let client_auth = ClientAuth::new(None);
+                        self.request_manager
+                            .create_authorization_request(
+                                client,
+                                client_auth,
+                                response.payload,
+                                Some(device_id),
+                                None,
+                            )
+                            .await
+                    }
                 }
             }
             OAuthAuthorizationRequestQuery::Uri(query) => {

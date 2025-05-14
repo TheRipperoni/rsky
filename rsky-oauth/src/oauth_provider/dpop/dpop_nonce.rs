@@ -1,10 +1,10 @@
 use crate::oauth_provider::constants::DPOP_NONCE_MAX_AGE;
 use crate::oauth_provider::lib::current_epoch;
 use hex::ToHex;
+use hmac::{Hmac, KeyInit, Mac};
 use rand::Rng;
-use ring::digest;
-use ring::digest::digest;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use std::time::SystemTime;
 
 #[derive(Clone)]
@@ -39,17 +39,19 @@ impl DpopNonce {
 
         let current_time = current_epoch();
         let counter = current_time / step;
-        let prev = compute(counter - 1);
-        let now = compute(counter);
-        let next = compute(counter + 1);
-        Ok(DpopNonce {
+
+        let mut dpop_nonce = Self {
             secret,
             counter,
-            prev,
-            now,
-            next,
+            prev: "".to_string(),
+            now: "".to_string(),
+            next: "".to_string(),
             step,
-        })
+        };
+        dpop_nonce.prev = dpop_nonce.compute(counter - 1);
+        dpop_nonce.now = dpop_nonce.compute(counter);
+        dpop_nonce.next = dpop_nonce.compute(counter + 1);
+        Ok(dpop_nonce)
     }
 
     pub fn next_nonce(&mut self) -> String {
@@ -62,23 +64,23 @@ impl DpopNonce {
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("timestamp in micros since UNIX epoch")
             .as_millis() as u64;
-        let counter = now / self.step | 0;
+        let counter = now / self.step;
         match counter - self.counter {
             0 => return,
             1 => {
                 self.prev = self.now.clone();
                 self.now = self.next.clone();
-                self.next = compute(counter + 1);
+                self.next = self.compute(counter + 1);
             }
             2 => {
                 self.prev = self.next.clone();
-                self.now = compute(counter);
-                self.next = compute(counter + 1);
+                self.now = self.compute(counter);
+                self.next = self.compute(counter + 1);
             }
             _ => {
-                self.prev = compute(counter - 1);
-                self.now = compute(counter);
-                self.next = compute(counter + 1)
+                self.prev = self.compute(counter - 1);
+                self.now = self.compute(counter);
+                self.next = self.compute(counter + 1)
             }
         }
         self.counter = counter;
@@ -95,7 +97,9 @@ impl DpopNonce {
         let step = _step.unwrap_or(DPOP_NONCE_MAX_AGE as u64 / 3);
         match input {
             None => {
-                let random_bytes = rand::rng().random::<[u8; 32]>();
+                let mut rng = rand::rng();
+                let mut random_bytes = [0u8; 32];
+                rng.fill(&mut random_bytes);
                 let secret = random_bytes.to_vec();
                 DpopNonce::new(secret, step)
             }
@@ -109,11 +113,15 @@ impl DpopNonce {
             },
         }
     }
-}
 
-fn compute(counter: u64) -> String {
-    let res = digest(&digest::SHA256, &num_to_64_bits(counter));
-    res.encode_hex()
+    fn compute(&self, counter: u64) -> String {
+        let counter_bytes = num_to_64_bits(counter);
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(&self.secret).expect("HMAC can take key of any size");
+        mac.update(&counter_bytes);
+        let result = mac.finalize().into_bytes();
+        result.encode_hex()
+    }
 }
 
 fn num_to_64_bits(num: u64) -> [u8; 8] {

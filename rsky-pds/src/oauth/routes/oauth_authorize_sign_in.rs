@@ -15,7 +15,6 @@ use rsky_oauth::oauth_provider::lib::http::request::{
 };
 use rsky_oauth::oauth_provider::lib::util::url::UrlReference;
 use rsky_oauth::oauth_provider::oauth_provider::SignInResponse;
-use rsky_oauth::oauth_provider::oidc::sub::Sub;
 use rsky_oauth::oauth_provider::request::request_uri::RequestUri;
 use rsky_oauth::oauth_types::OAuthClientId;
 use std::env;

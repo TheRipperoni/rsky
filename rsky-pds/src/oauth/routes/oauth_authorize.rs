@@ -1,17 +1,14 @@
 use crate::account_manager::AccountManager;
 use crate::apis::ApiError;
-use crate::oauth::routes::{csrf_cookie, OAuthAuthorizeResponse};
+use crate::oauth::routes::OAuthAuthorizeResponse;
 use crate::oauth::{SharedOAuthProvider, SharedReplayStore};
-use rocket::http::{Header, Status};
+use rocket::http::Status;
 use rocket::request::FromRequest;
-use rocket::response::{content, Responder};
 use rocket::{get, response, Request, Response, State};
 use rsky_oauth::oauth_provider::device::device_id::DeviceId;
 use rsky_oauth::oauth_provider::device::device_manager::DeviceManager;
 use rsky_oauth::oauth_provider::errors::OAuthError;
-use rsky_oauth::oauth_provider::lib::http::request::{
-    setup_csrf_token, validate_csrf_token, validate_fetch_site, validate_referer,
-};
+use rsky_oauth::oauth_provider::lib::http::request::validate_fetch_site;
 use rsky_oauth::oauth_provider::lib::util::url::UrlReference;
 use rsky_oauth::oauth_provider::oidc::sub::Sub;
 use rsky_oauth::oauth_provider::output::build_authorize_data::AuthorizationResultAuthorize;

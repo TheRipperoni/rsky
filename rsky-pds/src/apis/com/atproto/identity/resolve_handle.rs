@@ -2,7 +2,7 @@ use crate::account_manager::helpers::account::ActorAccount;
 use crate::account_manager::AccountManager;
 use crate::apis::ApiError;
 use crate::{SharedIdResolver, APP_USER_AGENT};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use rocket::serde::json::Json;
 use rocket::State;
 use rsky_common::env::{env_list, env_str};

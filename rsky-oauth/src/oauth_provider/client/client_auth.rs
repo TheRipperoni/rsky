@@ -1,4 +1,6 @@
 use crate::oauth_types::CLIENT_ASSERTION_TYPE_JWT_BEARER;
+use biscuit::jwk::JWK;
+use biscuit::Empty;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq)]
@@ -46,4 +48,15 @@ impl ClientAuth {
             ClientAuth::Some(_) => CLIENT_ASSERTION_TYPE_JWT_BEARER.to_string(),
         }
     }
+
+    pub fn jkt(&self) -> &str {
+        match self {
+            ClientAuth::None => "",
+            ClientAuth::Some(details) => &details.jkt,
+        }
+    }
+}
+
+pub async fn auth_jwk_thumbprint(key: &JWK<Empty>) -> String {
+    key.algorithm.thumbprint(&biscuit::digest::SHA512).unwrap()
 }

@@ -2,10 +2,6 @@ use crate::oauth::SharedOAuthProvider;
 use biscuit::jwk::JWKSet;
 use biscuit::jws::Secret;
 use biscuit::Empty;
-use jsonwebtoken::jwk::{
-    AlgorithmParameters, CommonParameters, EllipticCurve, EllipticCurveKeyParameters,
-    EllipticCurveKeyType, Jwk, JwkSet, KeyAlgorithm, KeyOperations, PublicKeyUse,
-};
 use rocket::yansi::Paint;
 use rsky_oauth::jwk::{Key, Keyset};
 use rsky_oauth::jwk_jose::jose_key::JoseKey;
@@ -18,8 +14,8 @@ use rsky_oauth::oauth_provider::oauth_hooks::OAuthHooks;
 use rsky_oauth::oauth_provider::oauth_provider::{OAuthProvider, OAuthProviderCreatorParams};
 use rsky_oauth::oauth_provider::output::customization::Customization;
 use rsky_oauth::oauth_types::{
-    HttpsUri, OAuthClientId, OAuthClientIdLoopback, OAuthClientMetadata, OAuthIssuerIdentifier,
-    ValidUri, WebUri,
+    OAuthClientId, OAuthClientIdLoopback, OAuthClientMetadata, OAuthIssuerIdentifier, ValidUri,
+    WebUri,
 };
 use rsky_oauth::simple_store_memory::SimpleStoreMemory;
 use std::env;

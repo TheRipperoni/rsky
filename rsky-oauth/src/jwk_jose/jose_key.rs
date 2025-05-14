@@ -283,6 +283,7 @@ impl Key for JoseKey {
                     Ok(VerifyResult {
                         payload,
                         protected_header,
+                        key: self.jwk.clone(),
                     })
                 }
                 Err(error) => Err(JwkError::JwtVerifyError(error.to_string())),
@@ -581,9 +582,10 @@ mod tests {
             protected_header: JwtHeader {
                 typ: Some("dpop+jwt".to_string()),
                 alg: Some("ES256".to_string()),
-                jwk: Some(jwk),
+                jwk: Some(jwk.clone()),
                 ..Default::default()
             },
+            key: jwk,
         };
         assert_eq!(verify_result, expected)
     }

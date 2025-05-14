@@ -20,7 +20,7 @@ use rsky_lexicon::com::atproto::repo::{
     ApplyWritesInput, ApplyWritesInputRefWrite, ApplyWritesOutput, ApplyWritesOutputCommit,
     ApplyWritesOutputResult,
 };
-use rsky_repo::types::{CommitAction, PreparedWrite, WriteOpAction};
+use rsky_repo::types::{PreparedWrite, WriteOpAction};
 use std::str::FromStr;
 
 async fn inner_apply_writes(
@@ -119,7 +119,7 @@ async fn inner_apply_writes(
         account_manager
             .update_repo_root(
                 did.to_string(),
-                commit.commit_data.cid.clone(),
+                commit.commit_data.cid,
                 commit.commit_data.rev.clone(),
             )
             .await?;

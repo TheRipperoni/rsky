@@ -3,6 +3,7 @@ use lexicon_cid::Cid;
 use libipld::cbor::encode::write_null;
 use libipld::cbor::DagCborCodec;
 use libipld::codec::Encode;
+use serde::Deserializer;
 use serde_cbor::Value as CborValue;
 use serde_json::{Value as JsonValue, Value};
 use std::collections::BTreeMap;
@@ -10,8 +11,7 @@ use std::io::Write;
 use thiserror::Error;
 
 /// Ipld
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Ipld {
     /// Represents a Cid.
     Link(Cid),
@@ -24,11 +24,77 @@ pub enum Ipld {
     /// Number
     Integer(i64),
     /// Represents a sequence of bytes.
-    #[serde(with = "serde_bytes")]
     Bytes(Vec<u8>),
     /// Represents a Json Value
     Json(JsonValue),
 }
+
+#[doc(hidden)]
+#[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
+const _: () = {
+    #[allow(unused_extern_crates, clippy::useless_attribute)]
+    extern crate serde as _serde;
+    #[automatically_derived]
+    impl<'de> _serde::Deserialize<'de> for Ipld {
+        fn deserialize<__D>(__deserializer: __D) -> _serde::__private::Result<Self, __D::Error>
+        where
+            __D: _serde::Deserializer<'de>,
+        {
+            let __content = <_serde::__private::de::Content as _serde::Deserialize>::deserialize(
+                __deserializer,
+            )?;
+            let __deserializer =
+                _serde::__private::de::ContentRefDeserializer::<__D::Error>::new(&__content);
+            if let _serde::__private::Ok(__ok) = _serde::__private::Result::map(
+                <Cid as _serde::Deserialize>::deserialize(__deserializer),
+                Ipld::Link,
+            ) {
+                return _serde::__private::Ok(__ok);
+            }
+            if let _serde::__private::Ok(__ok) = _serde::__private::Result::map(
+                <Vec<Ipld> as _serde::Deserialize>::deserialize(__deserializer),
+                Ipld::List,
+            ) {
+                return _serde::__private::Ok(__ok);
+            }
+            if let _serde::__private::Ok(__ok) = _serde::__private::Result::map(
+                <BTreeMap<String, Ipld> as _serde::Deserialize>::deserialize(__deserializer),
+                Ipld::Map,
+            ) {
+                return _serde::__private::Ok(__ok);
+            }
+            if let _serde::__private::Ok(__ok) = _serde::__private::Result::map(
+                <String as _serde::Deserialize>::deserialize(__deserializer),
+                Ipld::String,
+            ) {
+                return _serde::__private::Ok(__ok);
+            }
+            if let _serde::__private::Ok(__ok) = _serde::__private::Result::map(
+                <i64 as _serde::Deserialize>::deserialize(__deserializer),
+                Ipld::Integer,
+            ) {
+                return _serde::__private::Ok(__ok);
+            }
+            if let _serde::__private::Ok(__ok) = {
+                _serde::__private::Result::map(
+                    serde_bytes::deserialize(__deserializer),
+                    |__wrap: (Vec<u8>)| Ipld::Bytes(__wrap),
+                )
+            } {
+                return _serde::__private::Ok(__ok);
+            }
+            if let _serde::__private::Ok(__ok) = _serde::__private::Result::map(
+                <JsonValue as _serde::Deserialize>::deserialize(__deserializer),
+                Ipld::Json,
+            ) {
+                return _serde::__private::Ok(__ok);
+            }
+            _serde::__private::Err(_serde::de::Error::custom(
+                "data did not match any variant of untagged enum Ipld",
+            ))
+        }
+    }
+};
 
 impl serde::Serialize for Ipld {
     fn serialize<S>(&self, serializer: S) -> serde::__private::Result<S::Ok, S::Error>
