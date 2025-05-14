@@ -2,6 +2,8 @@ use crate::common::{create_account, get_admin_token};
 use diesel::row::NamedRow;
 use jsonwebtoken::jwk::JwkSet;
 use rocket::http::{ContentType, Header, Status};
+use rsky_lexicon::com::atproto::server::CreateInviteCodeOutput;
+use rsky_pds::config::ServerConfig;
 use rsky_lexicon::app::bsky::actor::{GetPreferencesOutput, ProfileViewDetailed};
 use rsky_lexicon::com::atproto::identity::ResolveHandleOutput;
 use rsky_lexicon::com::atproto::repo::ApplyWritesOutput;
@@ -223,12 +225,46 @@ async fn test_create_bsky_profile() {
     let response_status = response.status();
 
     assert_eq!(response_status, Status::Ok);
+    response
+        .into_json::<CreateInviteCodeOutput>()
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_create_invite_code_and_account() {
+    let postgres = common::get_postgres().await;
+    let client = common::get_client(&postgres).await;
+    let domain = client
+        .rocket()
+        .state::<ServerConfig>()
+        .unwrap()
+        .identity
+        .service_handle_domains
+        .first()
+        .unwrap();
+
+    let input = json!({
+        "useCount": 1
+    });
+
+    let response = client
+        .post("/xrpc/com.atproto.server.createInviteCode")
+        .header(ContentType::JSON)
+        .header(Header::new("Authorization", get_admin_token()))
+        .body(input.to_string())
+        .dispatch()
+        .await;
     let invite_code = response
         .into_json::<CreateInviteCodeOutput>()
         .await
         .unwrap()
         .code;
 
+    let account_input = json!({
+        "did": "did:plc:khvyd3oiw46vif5gm7hijslk",
+        "email": "foo@example.com",
+        "handle": format!("foo{domain}"),
     // Resolve Handle is available
     let response = client
         .get("/xrpc/com.atproto.identity.resolveHandle?handle=dummyabcdefghi1.rsky.com")

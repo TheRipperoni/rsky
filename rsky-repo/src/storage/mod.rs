@@ -1,4 +1,3 @@
-use anyhow::Result;
 use lexicon_cid::Cid;
 use libipld::cbor::encode::write_null;
 use libipld::cbor::DagCborCodec;
@@ -7,7 +6,6 @@ use serde::Deserializer;
 use serde_cbor::Value as CborValue;
 use serde_json::{Value as JsonValue, Value};
 use std::collections::BTreeMap;
-use std::io::Write;
 use thiserror::Error;
 
 /// Ipld
