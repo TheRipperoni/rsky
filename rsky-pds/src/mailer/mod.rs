@@ -4,6 +4,8 @@ extern crate mailgun_rs;
 
 use anyhow::Result;
 use mailgun_rs::{EmailAddress, Mailgun, MailgunRegion, Message};
+use rocket::yansi::Paint;
+use sendgrid::v3::{Content, Email, Personalization, Sender};
 use std::collections::HashMap;
 use std::env;
 
@@ -23,6 +25,21 @@ pub struct IdentifierAndTokenParams {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TokenParam {
     pub token: String,
+}
+
+pub async fn send_grid() {
+    let p = Personalization::new(Email::new("test@test.fr"));
+    let m = sendgrid::v3::Message::new(Email::new("g@gmail.com"))
+        .set_subject("Subject")
+        .add_content(
+            Content::new()
+                .set_content_type("text/html")
+                .set_value("Test"),
+        )
+        .add_personalization(p);
+
+    let sender = Sender::new("", None);
+    let resp = sender.send(&m).await.unwrap();
 }
 
 pub async fn send_template(opts: MailOpts) -> Result<()> {

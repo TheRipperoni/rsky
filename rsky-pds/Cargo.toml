@@ -74,6 +74,7 @@ http = "1.2.0"
 biscuit = "0.7.0"
 tracing-appender = "0.2"
 hmac = "0.12.1"
+sendgrid = "0.24.0"
 
 
 [dev-dependencies]

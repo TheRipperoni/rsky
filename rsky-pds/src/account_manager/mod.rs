@@ -7,7 +7,7 @@ use crate::account_manager::helpers::auth::{
 use crate::account_manager::helpers::invite::CodeDetail;
 use crate::account_manager::helpers::password::UpdateUserPasswordOpts;
 use crate::account_manager::helpers::token::FindByQbOpts;
-use crate::account_manager::helpers::{authorization_request, device_account, repo};
+use crate::account_manager::helpers::{authorization_request, device, device_account, repo};
 use crate::account_manager::helpers::{token, used_refresh_token};
 use crate::auth_verifier::AuthScope;
 use crate::db::DbConn;

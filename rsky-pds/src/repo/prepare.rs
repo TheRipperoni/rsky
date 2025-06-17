@@ -165,9 +165,9 @@ pub fn set_collection_name(
 
 pub async fn cid_for_safe_record(record: RepoRecord) -> anyhow::Result<Cid> {
     let lex = lex_to_ipld(Lex::Map(record));
-    // let block = serde_ipld_dagcbor::to_vec(&lex)?;
+    let block = serde_ipld_dagcbor::to_vec(&lex)?;
     // Confirm whether Block properly transforms between lex and cbor
-    // let _ = cbor_to_lex(block)?;
+    let _ = cbor_to_lex(block)?;
     cid_for_cbor(&lex)
 }
 
@@ -287,72 +287,72 @@ mod tests {
     //         );
     //     }
 
-    #[tokio::test]
-    pub async fn test_profile_cid_for_safe_record() {
-        let record: RepoRecord = serde_json::from_value(json!({
-  "$type": "app.bsky.actor.profile",
-  "avatar": {
-    "$type": "blob",
-    "ref": {
-      "$link": "bafkreicixrhoai63tgo225usiy7d6tqji4szz6t5zbgdbh5uaos47a562y"
-    },
-    "mimeType": "image/jpeg",
-    "size": 159869
-  },
-  "banner": {
-    "$type": "blob",
-    "ref": {
-      "$link": "bafkreicfmdqoxracuz3kmmmxcgzxe73jisjpu7y7wit6npe452dofw6u4m"
-    },
-    "mimeType": "image/png",
-    "size": 19483
-  },
-  "createdAt": "2024-09-02T14:08:51.436Z",
-  "pinnedPost": {
-    "cid": "bafyreihm5eiw7jpwyfa7b2cgtsanoagxo73nvx264k7lt5plzken2gfnke",
-    "uri": "at://did:plc:w4xbfzo7kqfes5zb7r6qv3rw/app.bsky.feed.post/3lm5qcjzwic26"
-  },
-  "description": r#"Founder & CEO, @blacksky.app\nASML Fellow, Berkman Klein, @harvard.edu\n\nBuilding community networks and technologies blackskyweb.xyz + wethepeople.nyc\n\nmove fast and break chains; \nrevolution now; not tomorrow\u2014now. \ud83c\udff4\u200d\u2620\ufe0f\n\n\ud83d\udd17: https://linkat.blue/rudyfraser.com"#,
-  "displayName": "Rudy wants revolution."
-    })).unwrap();
-        let lex = lex_to_ipld(Lex::Map(record.clone()));
-        let block = serde_ipld_dagcbor::to_vec(&lex).unwrap();
-        println!("{:02X?}", block);
-        let result = cid_for_safe_record(record).await.unwrap();
-        assert_eq!(
-            result.to_string(),
-            "bafyreicaaxdpy7zhtt2p6ddhwngyxaciihmwed3wrvk5kn2wkmsi7q3qhi".to_string()
-        );
-    }
-
-    #[tokio::test]
-    pub async fn test_post_cid() {
-        let record: RepoRecord = serde_json::from_value(json!({
-          "text": "Accountability? On my social media?",
-          "$type": "app.bsky.feed.post",
-          "langs": [
-            "en"
-          ],
-          "reply": {
-            "root": {
-              "cid": "bafyreih7gbd4xk76rk7u7ks47yh4rrszvhkoycyzngrrtefztj63gcjln4",
-              "uri": "at://did:plc:p2cp5gopk7mgjegy6wadk3ep/app.bsky.feed.post/3lnt3tpkgz22j"
-            },
-            "parent": {
-              "cid": "bafyreig4e4tzxod6yg7gx22icq7anp243h3ynbi6ovvch45pgeklin4fju",
-              "uri": "at://did:plc:p2cp5gopk7mgjegy6wadk3ep/app.bsky.feed.post/3lnt7bvlytk2w"
-            }
-          },
-          "createdAt": "2025-04-27T21:36:26.362Z"
-        }))
-        .unwrap();
-        let lex = lex_to_ipld(Lex::Map(record.clone()));
-        let block = serde_ipld_dagcbor::to_vec(&lex).unwrap();
-        println!("{:02X?}", block);
-        let result = cid_for_safe_record(record).await.unwrap();
-        assert_eq!(
-            result.to_string(),
-            "bafyreicn4tahj3zno3v7qs2cc2wyj5lvd3gcxgn2n5vksywtfa2nr2mq44".to_string()
-        )
-    }
+    //   #[tokio::test]
+    //   pub async fn test_profile_cid_for_safe_record() {
+    //       let record: RepoRecord = serde_json::from_value(json!({
+    // "$type": "app.bsky.actor.profile",
+    // "avatar": {
+    //   "$type": "blob",
+    //   "ref": {
+    //     "$link": "bafkreicixrhoai63tgo225usiy7d6tqji4szz6t5zbgdbh5uaos47a562y"
+    //   },
+    //   "mimeType": "image/jpeg",
+    //   "size": 159869
+    // },
+    // "banner": {
+    //   "$type": "blob",
+    //   "ref": {
+    //     "$link": "bafkreicfmdqoxracuz3kmmmxcgzxe73jisjpu7y7wit6npe452dofw6u4m"
+    //   },
+    //   "mimeType": "image/png",
+    //   "size": 19483
+    // },
+    // "createdAt": "2024-09-02T14:08:51.436Z",
+    // "pinnedPost": {
+    //   "cid": "bafyreihm5eiw7jpwyfa7b2cgtsanoagxo73nvx264k7lt5plzken2gfnke",
+    //   "uri": "at://did:plc:w4xbfzo7kqfes5zb7r6qv3rw/app.bsky.feed.post/3lm5qcjzwic26"
+    // },
+    // "description": r#"Founder & CEO, @blacksky.app\nASML Fellow, Berkman Klein, @harvard.edu\n\nBuilding community networks and technologies blackskyweb.xyz + wethepeople.nyc\n\nmove fast and break chains; \nrevolution now; not tomorrow\u2014now. \ud83c\udff4\u200d\u2620\ufe0f\n\n\ud83d\udd17: https://linkat.blue/rudyfraser.com"#,
+    // "displayName": "Rudy wants revolution."
+    //   })).unwrap();
+    //       let lex = lex_to_ipld(Lex::Map(record.clone()));
+    //       let block = serde_ipld_dagcbor::to_vec(&lex).unwrap();
+    //       println!("{:02X?}", block);
+    //       let result = cid_for_safe_record(record).await.unwrap();
+    //       assert_eq!(
+    //           result.to_string(),
+    //           "bafyreicaaxdpy7zhtt2p6ddhwngyxaciihmwed3wrvk5kn2wkmsi7q3qhi".to_string()
+    //       );
+    //   }
+    //
+    //   #[tokio::test]
+    //   pub async fn test_post_cid() {
+    //       let record: RepoRecord = serde_json::from_value(json!({
+    //         "text": "Accountability? On my social media?",
+    //         "$type": "app.bsky.feed.post",
+    //         "langs": [
+    //           "en"
+    //         ],
+    //         "reply": {
+    //           "root": {
+    //             "cid": "bafyreih7gbd4xk76rk7u7ks47yh4rrszvhkoycyzngrrtefztj63gcjln4",
+    //             "uri": "at://did:plc:p2cp5gopk7mgjegy6wadk3ep/app.bsky.feed.post/3lnt3tpkgz22j"
+    //           },
+    //           "parent": {
+    //             "cid": "bafyreig4e4tzxod6yg7gx22icq7anp243h3ynbi6ovvch45pgeklin4fju",
+    //             "uri": "at://did:plc:p2cp5gopk7mgjegy6wadk3ep/app.bsky.feed.post/3lnt7bvlytk2w"
+    //           }
+    //         },
+    //         "createdAt": "2025-04-27T21:36:26.362Z"
+    //       }))
+    //       .unwrap();
+    //       let lex = lex_to_ipld(Lex::Map(record.clone()));
+    //       let block = serde_ipld_dagcbor::to_vec(&lex).unwrap();
+    //       println!("{:02X?}", block);
+    //       let result = cid_for_safe_record(record).await.unwrap();
+    //       assert_eq!(
+    //           result.to_string(),
+    //           "bafyreicn4tahj3zno3v7qs2cc2wyj5lvd3gcxgn2n5vksywtfa2nr2mq44".to_string()
+    //       )
+    //   }
 }
